@@ -14794,7 +14794,7 @@ False
 <p>Now for the solution.  We rely on the following properties to be able to fully decrypt the messages:</p>
 <ul>
 <li>PKCS#7 always adds some padding; that is, the last plaintext byte will always be a padding byte.</li>
-<li>Per challenge 16 in set 2, we can modify any plaintext byte by modifying the corresponding ciphertext byte in the previous block (or initialization vector if we have access to that, as we do in this problem).</li>
+<li>Per <a href="set-2.html#Challenge-16:-CBC-bitflipping-attacks">challenge 16</a> in set 2, we can modify any plaintext byte by modifying the corresponding ciphertext byte in the previous block (or initialization vector if we have access to that, as we do in this problem).</li>
 <li>Because the operation is a simple XOR, we can set any plaintext byte to any value.  (We might not be able to predict what the value of the plaintext byte will be, but every value is achievable.)</li>
 <li>The server function tells us whether a manipulated message's padding is valid or not (regardless of what the correct padding is or should be).</li>
 <li>The padding check is performed, and the results of the padding check are returned, before the message is validated; thus, the message need not be valid.</li>
@@ -15064,7 +15064,7 @@ QSB0ZXJyaWJsZSBiZWF1dHkgaXMgYm9ybi4=
 <p>Points for automating this, but part of the reason I'm having you do this is that I think this approach is suboptimal.</p>
 </blockquote>
 <hr />
-<p>We go ahead and just decrypt the messages using a statistical approach as we will be asked to do in the next challenge, using code from challenges 3 and 6 from set 1.  It's amazing that we are able to perfectly decrypt using just a 1-gram probabilistic model.</p>
+<p>We go ahead and just decrypt the messages using a statistical approach as we will be asked to do in the next challenge, using code from challenges <a href="set-1.html#Challenge-3:-Single-byte-XOR-cipher">3</a> and <a href="set-1.html#Challenge-6:-Break-repeating-key-XOR">6</a> from set 1.  It's amazing that we are able to perfectly decrypt using just a 1-gram probabilistic model.</p>
 
 </div>
 </div>
