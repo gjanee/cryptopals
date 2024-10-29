@@ -15278,7 +15278,7 @@ $$<p>and $P_1 \oplus P_3 = IV$.  And if the initialization vector repeats the ke
 <span class="p">)</span>
 
 <span class="c1"># Hash the attack message as would be done by the server and check,</span>
-<span class="c1"># did we fool the server?</span>
+<span class="c1"># would we fool the server?</span>
 <span class="n">h_attack</span> <span class="o">=</span> <span class="n">sha1</span><span class="p">(</span><span class="n">random_key</span> <span class="o">+</span> <span class="n">attack_message</span><span class="p">)</span>
 <span class="n">h_fake</span> <span class="o">==</span> <span class="n">h_attack</span>
 </pre></div>
@@ -15459,7 +15459,7 @@ $$<p>and $P_1 \oplus P_3 = IV$.  And if the initialization vector repeats the ke
 <span class="p">)</span>
 
 <span class="c1"># Hash the attack message as would be done by the server and check,</span>
-<span class="c1"># did we fool the server?</span>
+<span class="c1"># would we fool the server?</span>
 <span class="n">h_attack</span> <span class="o">=</span> <span class="n">md4</span><span class="p">(</span><span class="n">random_key</span> <span class="o">+</span> <span class="n">attack_message</span><span class="p">)</span>
 <span class="n">h_fake</span> <span class="o">==</span> <span class="n">h_attack</span>
 </pre></div>
@@ -15759,7 +15759,7 @@ P(overall success) = 99.568%
     <span class="k">else</span><span class="p">:</span>
         <span class="n">signature</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">t</span><span class="p">:</span> <span class="n">t</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">])[</span><span class="s2">&quot;digit&quot;</span><span class="p">]</span>
 
-<span class="c1"># Did we correctly guess the correct signature?</span>
+<span class="c1"># Did we correctly guess the signature?</span>
 <span class="s2">&quot;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">signature</span><span class="p">)</span> <span class="o">==</span> <span class="n">hmac</span><span class="p">(</span><span class="n">random_key</span><span class="p">,</span> <span class="n">file</span><span class="p">)</span>
 </pre></div>
 
