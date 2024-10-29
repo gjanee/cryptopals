@@ -15202,8 +15202,8 @@ $$<p>and $P_1 \oplus P_3 = IV$.  And if the initialization vector repeats the ke
 
 
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain">
-<pre>40/40
-37/40
+<pre>38/40
+39/40
 37/40
 </pre>
 </div>
@@ -15663,7 +15663,7 @@ class="
             <span class="n">s</span> <span class="o">+=</span> <span class="n">N</span> <span class="o">-</span> <span class="n">seen</span><span class="p">[</span><span class="n">n</span><span class="o">+</span><span class="n">delta</span><span class="p">]</span>
             <span class="n">seen</span><span class="p">[</span><span class="n">n</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
     <span class="n">p_1</span> <span class="o">=</span> <span class="n">s</span><span class="o">/</span><span class="p">((</span><span class="n">M</span><span class="o">-</span><span class="n">delta</span><span class="p">)</span><span class="o">*</span><span class="n">N</span><span class="o">*</span><span class="n">N</span><span class="p">)</span>
-    <span class="n">p_success</span> <span class="o">=</span> <span class="n">p_1</span><span class="o">**</span><span class="mi">39</span>
+    <span class="n">p_success</span> <span class="o">=</span> <span class="n">p_1</span><span class="o">**</span><span class="p">(</span><span class="mi">40</span><span class="o">//</span><span class="n">delta</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
     <span class="nb">print</span><span class="p">(</span>
         <span class="s2">&quot;P(can distinguish number of comparisons performed)&quot;</span><span class="p">,</span>
         <span class="sa">f</span><span class="s2">&quot;= </span><span class="si">{</span><span class="nb">round</span><span class="p">(</span><span class="n">p_1</span><span class="o">*</span><span class="mi">100</span><span class="p">,</span> <span class="mi">3</span><span class="p">)</span><span class="si">}</span><span class="s2">%&quot;</span>
@@ -15857,7 +15857,7 @@ class="
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput " data-mime-type="text/markdown">
-<p>Statistically, the probability of correctly distinguishing the number of comparisons performed decreases, but particularly catastrophic is the effect on the overall probability of success:</p>
+<p>Statistically, the probability of correctly distinguishing the number of comparisons performed decreases, but particularly catastrophic is the effect on the probability of overall success:</p>
 
 </div>
 </div>
@@ -15907,7 +15907,7 @@ P(overall success) = 0.276%
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput " data-mime-type="text/markdown">
-<p>But suppose we were to guess two hex digits at a time.  Then out of 256 possibilities, one guess causes the server to perform 3+ comparisons, 15 guesses perform 2 comparisons, and the remaining 240 guesses perform only 1 comparison.  If the 3+ and the 1-comparison cases are sufficiently distinguishable, then the probability of overall success rises:</p>
+<p>But suppose we were to guess two hex digits at a time.  Then out of 256 possibilities, one guess causes the server to perform 3+ comparisons, 15 guesses perform 2 comparisons, and the remaining 240 guesses perform only 1 comparison.  If the 3+ and the 1-comparison cases are sufficiently distinguishable, then the probability of overall success rises.  (Note that, because we are guessing two digits at a time, we need repeat the process only 19 times, not 39.)</p>
 
 </div>
 </div>
@@ -15941,7 +15941,7 @@ P(overall success) = 0.276%
 
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain">
 <pre>P(can distinguish number of comparisons performed) = 96.387%
-P(overall success) = 23.806%
+P(overall success) = 49.697%
 </pre>
 </div>
 </div>
