@@ -3,7 +3,7 @@
 <head><meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>index</title><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.1.10/require.min.js"></script>
+<title>set-5</title><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.1.10/require.min.js"></script>
 
 
 
@@ -14597,17 +14597,435 @@ body[data-format='mobile'] .jp-OutputArea-child .jp-OutputArea-output {
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput " data-mime-type="text/markdown">
-<h1 id="Cryptopals-solutions">Cryptopals solutions<a class="anchor-link" href="#Cryptopals-solutions">&#182;</a></h1><p>Python notebook solutions to <a href="https://cryptopals.com">the cryptopals crypto challenges</a>.  What is cryptopals?  From the website:</p>
-<blockquote>
-<p>This is a different way to learn about crypto than taking a class or reading a book.  We give you problems to solve.  They're derived from weaknesses in real-world systems and modern cryptographic constructions.  We give you enough info to learn about the underlying crypto concepts yourself.  When you're finished, you'll not only have learned a good deal about how cryptosystems are built, but you'll also understand how they're attacked.</p>
-</blockquote>
-<p>Solutions:</p>
+<h1 id="Set-5:-Diffie-Hellman-and-friends">Set 5: Diffie-Hellman and friends<a class="anchor-link" href="#Set-5:-Diffie-Hellman-and-friends">&#182;</a></h1><p>This is the first set of <strong>number-theoretic cryptography</strong> challenges, and also our coverage of message authentication.</p>
+<p>This set is <strong>significantly harder</strong> than the last set.  The concepts are new, the attacks bear no resemblance to those of the previous sets, and... math.</p>
+<p>On the other hand, <strong>our favorite cryptanalytic attack ever</strong> is in this set (you'll see it soon).  We're happy with this set.  Don't wimp out here.  You're almost done!</p>
 <ul>
-<li><a href="set-1.html">Set 1</a></li>
-<li><a href="set-2.html">Set 2</a></li>
-<li><a href="set-3.html">Set 3</a></li>
-<li><a href="set-4.html">Set 4</a></li>
-<li><a href="set-5.html">Set 5</a></li>
+<li><a href="#Preliminaries">Preliminaries</a></li>
+<li><a href="#Challenge-33:-Implement-Diffie-Hellman">Challenge 33: Implement Diffie-Hellman</a></li>
+<li><a href="#Challenge-34:-Implement-a-MITM-key-fixing-attack-on-Diffie-Hellman-with-parameter-injection">Challenge 34: Implement a MITM key-fixing attack on Diffie-Hellman with parameter injection</a></li>
+<li><a href="#Challenge-35:-Implement-DH-with-negotiated-groups,-and-break-with-malicious-%22g%22-parameters">Challenge 35: Implement DH with negotiated groups, and break with malicious &quot;g&quot; parameters</a></li>
+</ul>
+<h2 id="Preliminaries">Preliminaries<a class="anchor-link" href="#Preliminaries">&#182;</a></h2>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs  ">
+<div class="jp-Cell-inputWrapper">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In&nbsp;[1]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+     <div class="CodeMirror cm-s-jupyter">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="kn">from</span> <span class="nn">random</span> <span class="kn">import</span> <span class="n">randint</span><span class="p">,</span> <span class="n">randbytes</span>
+
+<span class="c1"># From pyca/cryptography</span>
+<span class="kn">from</span> <span class="nn">cryptography.hazmat.primitives</span> <span class="kn">import</span> <span class="n">padding</span>
+<span class="kn">from</span> <span class="nn">cryptography.hazmat.primitives.ciphers</span> <span class="kn">import</span> <span class="n">Cipher</span><span class="p">,</span> <span class="n">algorithms</span><span class="p">,</span> <span class="n">modes</span>
+<span class="kn">from</span> <span class="nn">cryptography.hazmat.primitives.hashes</span> <span class="kn">import</span> <span class="n">Hash</span><span class="p">,</span> <span class="n">SHA1</span>
+
+<span class="k">def</span> <span class="nf">pad_pkcs7</span><span class="p">(</span><span class="n">text</span><span class="p">):</span>
+    <span class="n">padder</span> <span class="o">=</span> <span class="n">padding</span><span class="o">.</span><span class="n">PKCS7</span><span class="p">(</span><span class="mi">128</span><span class="p">)</span><span class="o">.</span><span class="n">padder</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">padder</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">text</span><span class="p">)</span> <span class="o">+</span> <span class="n">padder</span><span class="o">.</span><span class="n">finalize</span><span class="p">()</span>
+
+<span class="k">def</span> <span class="nf">unpad_pkcs7</span><span class="p">(</span><span class="n">text</span><span class="p">):</span>
+    <span class="n">unpadder</span> <span class="o">=</span> <span class="n">padding</span><span class="o">.</span><span class="n">PKCS7</span><span class="p">(</span><span class="mi">128</span><span class="p">)</span><span class="o">.</span><span class="n">unpadder</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">unpadder</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">text</span><span class="p">)</span> <span class="o">+</span> <span class="n">unpadder</span><span class="o">.</span><span class="n">finalize</span><span class="p">()</span>
+
+<span class="k">def</span> <span class="nf">aes_128_cbc_encrypt</span><span class="p">(</span><span class="n">ptext</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">iv</span><span class="p">):</span>
+    <span class="n">encryptor</span> <span class="o">=</span> <span class="n">Cipher</span><span class="p">(</span><span class="n">algorithms</span><span class="o">.</span><span class="n">AES128</span><span class="p">(</span><span class="n">key</span><span class="p">),</span> <span class="n">modes</span><span class="o">.</span><span class="n">CBC</span><span class="p">(</span><span class="n">iv</span><span class="p">))</span><span class="o">.</span><span class="n">encryptor</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">encryptor</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">pad_pkcs7</span><span class="p">(</span><span class="n">ptext</span><span class="p">))</span> <span class="o">+</span> <span class="n">encryptor</span><span class="o">.</span><span class="n">finalize</span><span class="p">()</span>
+
+<span class="k">def</span> <span class="nf">aes_128_cbc_decrypt</span><span class="p">(</span><span class="n">ctext</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">iv</span><span class="p">):</span>
+    <span class="n">decryptor</span> <span class="o">=</span> <span class="n">Cipher</span><span class="p">(</span><span class="n">algorithms</span><span class="o">.</span><span class="n">AES128</span><span class="p">(</span><span class="n">key</span><span class="p">),</span> <span class="n">modes</span><span class="o">.</span><span class="n">CBC</span><span class="p">(</span><span class="n">iv</span><span class="p">))</span><span class="o">.</span><span class="n">decryptor</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">unpad_pkcs7</span><span class="p">(</span><span class="n">decryptor</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">ctext</span><span class="p">)</span> <span class="o">+</span> <span class="n">decryptor</span><span class="o">.</span><span class="n">finalize</span><span class="p">())</span>
+
+<span class="k">def</span> <span class="nf">sha1</span><span class="p">(</span><span class="n">message</span><span class="p">):</span>
+    <span class="n">h</span> <span class="o">=</span> <span class="n">Hash</span><span class="p">(</span><span class="n">SHA1</span><span class="p">())</span>
+    <span class="n">h</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">h</span><span class="o">.</span><span class="n">finalize</span><span class="p">()</span>
+
+<span class="k">def</span> <span class="nf">modexp</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">e</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>
+    <span class="c1"># Compute (a**e)%n where e may be very large</span>
+    <span class="n">r</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="n">p</span> <span class="o">=</span> <span class="n">a</span>
+    <span class="k">while</span> <span class="n">e</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">e</span><span class="o">%</span><span class="k">2</span> == 1:
+            <span class="n">r</span> <span class="o">=</span> <span class="p">(</span><span class="n">r</span><span class="o">*</span><span class="n">p</span><span class="p">)</span><span class="o">%</span><span class="k">n</span>
+        <span class="n">p</span> <span class="o">=</span> <span class="p">(</span><span class="n">p</span><span class="o">*</span><span class="n">p</span><span class="p">)</span><span class="o">%</span><span class="k">n</span>
+        <span class="n">e</span> <span class="o">&gt;&gt;=</span> <span class="mi">1</span>
+    <span class="k">return</span> <span class="n">r</span>
+</pre></div>
+
+     </div>
+</div>
+</div>
+</div>
+
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
+<div class="jp-Cell-inputWrapper">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput " data-mime-type="text/markdown">
+<h2 id="Challenge-33:-Implement-Diffie-Hellman">Challenge 33: Implement Diffie-Hellman<a class="anchor-link" href="#Challenge-33:-Implement-Diffie-Hellman">&#182;</a></h2><p>For one of the most important algorithms in cryptography this exercise couldn't be a whole lot easier.</p>
+<p>Set a variable &quot;p&quot; to 37 and &quot;g&quot; to 5.  This algorithm is so easy I'm not even going to explain it.  Just do what I do.</p>
+<p>Generate &quot;a&quot;, a random number mod 37.  Now generate &quot;A&quot;, which is &quot;g&quot; raised to the &quot;a&quot; power mod 37 --- A = (g**a) % p.</p>
+<p>Do the same for &quot;b&quot; and &quot;B&quot;.</p>
+<p>&quot;A&quot; and &quot;B&quot; are public keys.  Generate a session key with them; set &quot;s&quot; to &quot;B&quot; raised to the &quot;a&quot; power mod 37 --- s = (B**a) % p.</p>
+<p>Do the same with A**b, check that you come up with the same &quot;s&quot;.</p>
+<p>To turn &quot;s&quot; into a key, you can just hash it to create 128 bits of key material (or SHA256 it to create a key for encrypting and a key for a MAC).</p>
+<p>Ok, that was fun, now repeat the exercise with bignums like in the real world. Here are parameters NIST likes:</p>
+<pre><code>p:
+ffffffffffffffffc90fdaa22168c234c4c6628b80dc1cd129024
+e088a67cc74020bbea63b139b22514a08798e3404ddef9519b3cd
+3a431b302b0a6df25f14374fe1356d6d51c245e485b576625e7ec
+6f44c42e9a637ed6b0bff5cb6f406b7edee386bfb5a899fa5ae9f
+24117c4b1fe649286651ece45b3dc2007cb8a163bf0598da48361
+c55d39a69163fa8fd24cf5f83655d23dca3ad961c62f356208552
+bb9ed529077096966d670c354e4abc9804f1746c08ca237327fff
+fffffffffffff
+
+g: 2
+</code></pre>
+<p>This is very easy to do in Python or Ruby or other high-level languages that auto-promote fixnums to bignums, but it isn't &quot;hard&quot; anywhere.</p>
+<p>Note that you'll need to write your own modexp (this is blackboard math, don't freak out), because you'll blow out your bignum library raising &quot;a&quot; to the 1024-bit-numberth power.  You can find modexp routines on Rosetta Code for most languages.</p>
+<hr />
+<p>The 1,536-bit prime <code>p</code> and generator value <code>g = 2</code> are among the various values recommended in <a href="https://datatracker.ietf.org/doc/html/rfc3526">RFC 3526</a>.  There does not seem to be a required size for the private key, but 256 bits appears as a recommendation in a few places.  That the session keys as generated by A and B are equal just follows from the law of exponents.</p>
+
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell   ">
+<div class="jp-Cell-inputWrapper">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In&nbsp;[2]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+     <div class="CodeMirror cm-s-jupyter">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="n">P</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span>
+    <span class="s2">&quot;ffffffffffffffffc90fdaa22168c234c4c6628b80dc1cd129024&quot;</span>
+    <span class="s2">&quot;e088a67cc74020bbea63b139b22514a08798e3404ddef9519b3cd&quot;</span>
+    <span class="s2">&quot;3a431b302b0a6df25f14374fe1356d6d51c245e485b576625e7ec&quot;</span>
+    <span class="s2">&quot;6f44c42e9a637ed6b0bff5cb6f406b7edee386bfb5a899fa5ae9f&quot;</span>
+    <span class="s2">&quot;24117c4b1fe649286651ece45b3dc2007cb8a163bf0598da48361&quot;</span>
+    <span class="s2">&quot;c55d39a69163fa8fd24cf5f83655d23dca3ad961c62f356208552&quot;</span>
+    <span class="s2">&quot;bb9ed529077096966d670c354e4abc9804f1746c08ca237327fff&quot;</span>
+    <span class="s2">&quot;fffffffffffff&quot;</span><span class="p">,</span>
+    <span class="mi">16</span>
+<span class="p">)</span>
+
+<span class="n">G</span> <span class="o">=</span> <span class="mi">2</span>
+
+<span class="k">def</span> <span class="nf">generate_dh_keypair</span><span class="p">(</span><span class="n">prime</span><span class="p">,</span> <span class="n">generator</span><span class="p">):</span>
+    <span class="c1"># Return private key, public key</span>
+    <span class="n">k</span> <span class="o">=</span> <span class="n">randint</span><span class="p">(</span><span class="mi">2</span><span class="o">**</span><span class="mi">255</span><span class="p">,</span> <span class="mi">2</span><span class="o">**</span><span class="mi">256</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">K</span> <span class="o">=</span> <span class="n">modexp</span><span class="p">(</span><span class="n">generator</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">prime</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">k</span><span class="p">,</span> <span class="n">K</span>
+
+<span class="k">def</span> <span class="nf">package_session_key_value</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">sha1</span><span class="p">(</span><span class="n">value</span><span class="o">.</span><span class="n">to_bytes</span><span class="p">(</span><span class="mi">192</span><span class="p">,</span> <span class="s2">&quot;big&quot;</span><span class="p">))[:</span><span class="mi">16</span><span class="p">]</span>
+
+<span class="k">def</span> <span class="nf">session_key</span><span class="p">(</span><span class="n">private_key</span><span class="p">,</span> <span class="n">public_key</span><span class="p">,</span> <span class="n">prime</span><span class="p">):</span>
+    <span class="c1"># My private key, their public key</span>
+    <span class="k">return</span> <span class="n">package_session_key_value</span><span class="p">(</span><span class="n">modexp</span><span class="p">(</span><span class="n">public_key</span><span class="p">,</span> <span class="n">private_key</span><span class="p">,</span> <span class="n">prime</span><span class="p">))</span>
+
+<span class="n">a</span><span class="p">,</span> <span class="n">A</span> <span class="o">=</span> <span class="n">generate_dh_keypair</span><span class="p">(</span><span class="n">P</span><span class="p">,</span> <span class="n">G</span><span class="p">)</span>
+<span class="n">b</span><span class="p">,</span> <span class="n">B</span> <span class="o">=</span> <span class="n">generate_dh_keypair</span><span class="p">(</span><span class="n">P</span><span class="p">,</span> <span class="n">G</span><span class="p">)</span>
+
+<span class="n">session_key</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">B</span><span class="p">,</span> <span class="n">P</span><span class="p">)</span> <span class="o">==</span> <span class="n">session_key</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="n">A</span><span class="p">,</span> <span class="n">P</span><span class="p">)</span>
+</pre></div>
+
+     </div>
+</div>
+</div>
+</div>
+
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+
+
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child jp-OutputArea-executeResult">
+    
+    <div class="jp-OutputPrompt jp-OutputArea-prompt">Out[2]:</div>
+
+
+
+
+<div class="jp-RenderedText jp-OutputArea-output jp-OutputArea-executeResult" data-mime-type="text/plain">
+<pre>True</pre>
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
+<div class="jp-Cell-inputWrapper">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput " data-mime-type="text/markdown">
+<h2 id="Challenge-34:-Implement-a-MITM-key-fixing-attack-on-Diffie-Hellman-with-parameter-injection">Challenge 34: Implement a MITM key-fixing attack on Diffie-Hellman with parameter injection<a class="anchor-link" href="#Challenge-34:-Implement-a-MITM-key-fixing-attack-on-Diffie-Hellman-with-parameter-injection">&#182;</a></h2><p>Use the code you just worked out to build a protocol and an &quot;echo&quot; bot.  You don't actually have to do the network part of this if you don't want; just simulate that.  The protocol is:</p>
+<p><strong>A-&gt;B</strong><br />
+Send &quot;p&quot;, &quot;g&quot;, &quot;A&quot;<br />
+<strong>B-&gt;A</strong><br />
+Send &quot;B&quot;<br />
+<strong>A-&gt;B</strong><br />
+Send AES-CBC(SHA1(s)[0:16], iv=random(16), msg) + iv<br />
+<strong>B-&gt;A</strong><br />
+Send AES-CBC(SHA1(s)[0:16], iv=random(16), A's msg) + iv</p>
+<p>(In other words, derive an AES key from DH with SHA1, use it in both directions, and do CBC with random IVs appended or prepended to the message.)</p>
+<p>Now implement the following MITM attack:</p>
+<p><strong>A-&gt;M</strong><br />
+Send &quot;p&quot;, &quot;g&quot;, &quot;A&quot;<br />
+<strong>M-&gt;B</strong><br />
+Send &quot;p&quot;, &quot;g&quot;, &quot;p&quot;<br />
+<strong>B-&gt;M</strong><br />
+Send &quot;B&quot;<br />
+<strong>M-&gt;A</strong><br />
+Send &quot;p&quot;<br />
+<strong>A-&gt;M</strong><br />
+Send AES-CBC(SHA1(s)[0:16], iv=random(16), msg) + iv<br />
+<strong>M-&gt;B</strong><br />
+Relay that to B<br />
+<strong>B-&gt;M</strong><br />
+Send AES-CBC(SHA1(s)[0:16], iv=random(16), A's msg) + iv<br />
+<strong>M-&gt;A</strong><br />
+Relay that to A</p>
+<p>M should be able to decrypt the messages.  &quot;A&quot; and &quot;B&quot; in the protocol --- the public keys, over the wire --- have been swapped out with &quot;p&quot;.  Do the DH math on this quickly to see what that does to the predictability of the key.</p>
+<p>Decrypt the messages from M's vantage point as they go by.</p>
+<p>Note that you don't actually have to inject bogus parameters to make this attack work; you could just generate Ma, MA, Mb, and MB as valid DH parameters to do a generic MITM attack.  But do the parameter injection attack; it's going to come up again.</p>
+
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell   ">
+<div class="jp-Cell-inputWrapper">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In&nbsp;[3]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+     <div class="CodeMirror cm-s-jupyter">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="k">class</span> <span class="nc">Person</span><span class="p">:</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">name</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="n">name</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">name_bytes</span> <span class="o">=</span> <span class="nb">bytes</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;ASCII&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">is_initiator</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="k">def</span> <span class="nf">start</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">prime</span><span class="p">,</span> <span class="n">generator</span><span class="p">,</span> <span class="n">other_person</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">is_initiator</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prime</span> <span class="o">=</span> <span class="n">prime</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">generator</span> <span class="o">=</span> <span class="n">generator</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">private_key</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">public_key</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">generate_dh_keypair</span><span class="p">(</span><span class="n">prime</span><span class="p">,</span> <span class="n">generator</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">send_open_channel_request</span><span class="p">(</span><span class="n">other_person</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">send_open_channel_request</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">recipient</span><span class="p">):</span>
+        <span class="n">recipient</span><span class="o">.</span><span class="n">recv_open_channel_request</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">prime</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">generator</span><span class="p">,</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">public_key</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">recv_open_channel_request</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">sender</span><span class="p">,</span> <span class="n">prime</span><span class="p">,</span> <span class="n">generator</span><span class="p">,</span> <span class="n">sender_public_key</span>
+    <span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">private_key</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">public_key</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">generate_dh_keypair</span><span class="p">(</span><span class="n">prime</span><span class="p">,</span> <span class="n">generator</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">session_key</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">session_key</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">private_key</span><span class="p">,</span> <span class="n">sender_public_key</span><span class="p">,</span> <span class="n">prime</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">send_open_channel_ack</span><span class="p">(</span><span class="n">sender</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">send_open_channel_ack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">recipient</span><span class="p">):</span>
+        <span class="n">recipient</span><span class="o">.</span><span class="n">recv_open_channel_ack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">public_key</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">recv_open_channel_ack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sender</span><span class="p">,</span> <span class="n">sender_public_key</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">session_key</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="n">session_key</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">private_key</span><span class="p">,</span> <span class="n">sender_public_key</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">prime</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">send_message</span><span class="p">(</span><span class="n">sender</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">name_bytes</span> <span class="o">+</span> <span class="sa">b</span><span class="s2">&quot; says hi&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">send_message</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">recipient</span><span class="p">,</span> <span class="n">message</span><span class="p">):</span>
+        <span class="n">iv</span> <span class="o">=</span> <span class="n">randbytes</span><span class="p">(</span><span class="mi">16</span><span class="p">)</span>
+        <span class="n">ctext</span> <span class="o">=</span> <span class="n">aes_128_cbc_encrypt</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">session_key</span><span class="p">,</span> <span class="n">iv</span><span class="p">)</span>
+        <span class="n">recipient</span><span class="o">.</span><span class="n">recv_message</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctext</span><span class="p">,</span> <span class="n">iv</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">recv_message</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sender</span><span class="p">,</span> <span class="n">ctext</span><span class="p">,</span> <span class="n">iv</span><span class="p">):</span>
+        <span class="n">message</span> <span class="o">=</span> <span class="n">aes_128_cbc_decrypt</span><span class="p">(</span><span class="n">ctext</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">session_key</span><span class="p">,</span> <span class="n">iv</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2"> received: </span><span class="si">{</span><span class="n">message</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;ASCII&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_initiator</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="n">iv</span> <span class="o">=</span> <span class="n">randbytes</span><span class="p">(</span><span class="mi">16</span><span class="p">)</span>
+        <span class="n">response</span> <span class="o">=</span> <span class="n">message</span> <span class="o">+</span> <span class="sa">b</span><span class="s2">&quot;, &quot;</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">name_bytes</span> <span class="o">+</span> <span class="sa">b</span><span class="s2">&quot; says hi back&quot;</span>
+        <span class="n">ctext</span> <span class="o">=</span> <span class="n">aes_128_cbc_encrypt</span><span class="p">(</span><span class="n">response</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">session_key</span><span class="p">,</span> <span class="n">iv</span><span class="p">)</span>
+        <span class="n">sender</span><span class="o">.</span><span class="n">recv_message</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ctext</span><span class="p">,</span> <span class="n">iv</span><span class="p">)</span>
+
+<span class="n">A</span> <span class="o">=</span> <span class="n">Person</span><span class="p">(</span><span class="s2">&quot;Alice&quot;</span><span class="p">)</span>
+<span class="n">B</span> <span class="o">=</span> <span class="n">Person</span><span class="p">(</span><span class="s2">&quot;Bob&quot;</span><span class="p">)</span>
+<span class="n">A</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">P</span><span class="p">,</span> <span class="n">G</span><span class="p">,</span> <span class="n">other_person</span><span class="o">=</span><span class="n">B</span><span class="p">)</span>
+</pre></div>
+
+     </div>
+</div>
+</div>
+</div>
+
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+
+
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+    
+    <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+
+
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain">
+<pre>Bob received: Alice says hi
+Alice received: Alice says hi, Bob says hi back
+</pre>
+</div>
+</div>
+
+</div>
+
+</div>
+
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
+<div class="jp-Cell-inputWrapper">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput " data-mime-type="text/markdown">
+<p>If the public key is set to $p$ (which is a little odd, as it's supposed to be a value modulo $p$, but let's roll with the idea), then the session key is predictable: $s = p^a \bmod p = 0$ for any private key $a$.</p>
+
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell   ">
+<div class="jp-Cell-inputWrapper">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In&nbsp;[4]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+     <div class="CodeMirror cm-s-jupyter">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="k">class</span> <span class="nc">MITM</span><span class="p">(</span><span class="n">Person</span><span class="p">):</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">downstream_person</span><span class="p">):</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="s2">&quot;MITM&quot;</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">downstream_person</span> <span class="o">=</span> <span class="n">downstream_person</span>
+
+    <span class="k">def</span> <span class="nf">recv_open_channel_request</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">sender</span><span class="p">,</span> <span class="n">prime</span><span class="p">,</span> <span class="n">generator</span><span class="p">,</span> <span class="n">sender_public_key</span>
+    <span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">upstream_person</span> <span class="o">=</span> <span class="n">sender</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">prime</span> <span class="o">=</span> <span class="n">prime</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">generator</span> <span class="o">=</span> <span class="n">generator</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">private_key</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># arbitrary</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">public_key</span> <span class="o">=</span> <span class="n">prime</span>  <span class="c1"># the weird part</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">session_key</span> <span class="o">=</span> <span class="n">package_session_key_value</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">send_open_channel_request</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">downstream_person</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">send_open_channel_ack</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">upstream_person</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">recv_open_channel_ack</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sender</span><span class="p">,</span> <span class="n">sender_public_key</span><span class="p">):</span>
+        <span class="k">pass</span>
+
+    <span class="k">def</span> <span class="nf">recv_message</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sender</span><span class="p">,</span> <span class="n">ctext</span><span class="p">,</span> <span class="n">iv</span><span class="p">):</span>
+        <span class="n">message</span> <span class="o">=</span> <span class="n">aes_128_cbc_decrypt</span><span class="p">(</span><span class="n">ctext</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">session_key</span><span class="p">,</span> <span class="n">iv</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2"> intercepted: </span><span class="si">{</span><span class="n">message</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;ASCII&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">sender</span> <span class="o">==</span> <span class="bp">self</span><span class="o">.</span><span class="n">upstream_person</span><span class="p">:</span>
+            <span class="n">other_person</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">downstream_person</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">other_person</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">upstream_person</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">send_message</span><span class="p">(</span><span class="n">other_person</span><span class="p">,</span> <span class="n">message</span><span class="p">)</span>
+
+<span class="n">A</span> <span class="o">=</span> <span class="n">Person</span><span class="p">(</span><span class="s2">&quot;Alice&quot;</span><span class="p">)</span>
+<span class="n">B</span> <span class="o">=</span> <span class="n">Person</span><span class="p">(</span><span class="s2">&quot;Bob&quot;</span><span class="p">)</span>
+<span class="n">A</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">P</span><span class="p">,</span> <span class="n">G</span><span class="p">,</span> <span class="n">other_person</span><span class="o">=</span><span class="n">MITM</span><span class="p">(</span><span class="n">downstream_person</span><span class="o">=</span><span class="n">B</span><span class="p">))</span>
+</pre></div>
+
+     </div>
+</div>
+</div>
+</div>
+
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+
+
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+    
+    <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+
+
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain">
+<pre>MITM intercepted: Alice says hi
+Bob received: Alice says hi
+MITM intercepted: Alice says hi, Bob says hi back
+Alice received: Alice says hi, Bob says hi back
+</pre>
+</div>
+</div>
+
+</div>
+
+</div>
+
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
+<div class="jp-Cell-inputWrapper">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput " data-mime-type="text/markdown">
+<h2 id="Challenge-35:-Implement-DH-with-negotiated-groups,-and-break-with-malicious-%22g%22-parameters">Challenge 35: Implement DH with negotiated groups, and break with malicious "g" parameters<a class="anchor-link" href="#Challenge-35:-Implement-DH-with-negotiated-groups,-and-break-with-malicious-%22g%22-parameters">&#182;</a></h2><p><strong>A-&gt;B</strong><br />
+Send &quot;p&quot;, &quot;g&quot;<br />
+<strong>B-&gt;A</strong><br />
+Send ACK<br />
+<strong>A-&gt;B</strong><br />
+Send &quot;A&quot;<br />
+<strong>B-&gt;A</strong><br />
+Send &quot;B&quot;<br />
+<strong>A-&gt;B</strong><br />
+Send AES-CBC(SHA1(s)[0:16], iv=random(16), msg) + iv<br />
+<strong>B-&gt;A</strong><br />
+Send AES-CBC(SHA1(s)[0:16], iv=random(16), A's msg) + iv</p>
+<p>Do the MITM attack again, but play with &quot;g&quot;. What happens with:</p>
+<pre><code>g = 1
+g = p
+g = p - 1
+</code></pre>
+<p>Write attacks for each.</p>
+<blockquote>
+<p><strong>When does this ever happen?</strong></p>
+<p>Honestly, not that often in real-world systems.  If you can mess with &quot;g&quot;, chances are you can mess with something worse.  Most systems pre-agree on a static DH group.  But the same construction exists in Elliptic Curve Diffie-Hellman, and this becomes more relevant there.</p>
+</blockquote>
+<hr />
+<p>There's not much to do here.  Setting $g$ to any of these values means that the session key is predictable.  As the previous challenge admitted, a man-in-the-middle doesn't need to inject parameter values because it can just create session keys as normal.  But for the record:</p>
+<ul>
+<li>If $g = 1$, then $A = B = s = 1$.</li>
+<li>If $g = p$, then $A = B = s = 0$.</li>
+<li>If $g = p-1$, then $A = B = s = \pm 1$ depending on the evenness of private keys.</li>
 </ul>
 
 </div>
