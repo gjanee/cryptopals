@@ -14605,6 +14605,9 @@ body[data-format='mobile'] .jp-OutputArea-child .jp-OutputArea-output {
 <li><a href="#Challenge-33:-Implement-Diffie-Hellman">Challenge 33: Implement Diffie-Hellman</a></li>
 <li><a href="#Challenge-34:-Implement-a-MITM-key-fixing-attack-on-Diffie-Hellman-with-parameter-injection">Challenge 34: Implement a MITM key-fixing attack on Diffie-Hellman with parameter injection</a></li>
 <li><a href="#Challenge-35:-Implement-DH-with-negotiated-groups,-and-break-with-malicious-%22g%22-parameters">Challenge 35: Implement DH with negotiated groups, and break with malicious &quot;g&quot; parameters</a></li>
+<li><a href="#Challenge-36:-Implement-Secure-Remote-Password-(SRP)">Challenge 36: Implement Secure Remote Password (SRP)</a></li>
+<li><a href="#Challenge-37:-Break-SRP-with-a-zero-key">Challenge 37: Break SRP with a zero key</a></li>
+<li><a href="#Challenge-38:-Offline-dictionary-attack-on-simplified-SRP">Challenge 38: Offline dictionary attack on simplified SRP</a></li>
 </ul>
 <h2 id="Preliminaries">Preliminaries<a class="anchor-link" href="#Preliminaries">&#182;</a></h2>
 </div>
@@ -14618,12 +14621,14 @@ body[data-format='mobile'] .jp-OutputArea-child .jp-OutputArea-output {
 <div class="jp-InputPrompt jp-InputArea-prompt">In&nbsp;[1]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
      <div class="CodeMirror cm-s-jupyter">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="kn">from</span> <span class="nn">random</span> <span class="kn">import</span> <span class="n">randint</span><span class="p">,</span> <span class="n">randbytes</span>
+<div class=" highlight hl-ipython3"><pre><span></span><span class="kn">from</span> <span class="nn">collections</span> <span class="kn">import</span> <span class="n">defaultdict</span>
+<span class="kn">from</span> <span class="nn">random</span> <span class="kn">import</span> <span class="n">randint</span><span class="p">,</span> <span class="n">randbytes</span><span class="p">,</span> <span class="n">choice</span>
 
 <span class="c1"># From pyca/cryptography</span>
 <span class="kn">from</span> <span class="nn">cryptography.hazmat.primitives</span> <span class="kn">import</span> <span class="n">padding</span>
 <span class="kn">from</span> <span class="nn">cryptography.hazmat.primitives.ciphers</span> <span class="kn">import</span> <span class="n">Cipher</span><span class="p">,</span> <span class="n">algorithms</span><span class="p">,</span> <span class="n">modes</span>
-<span class="kn">from</span> <span class="nn">cryptography.hazmat.primitives.hashes</span> <span class="kn">import</span> <span class="n">Hash</span><span class="p">,</span> <span class="n">SHA1</span>
+<span class="kn">from</span> <span class="nn">cryptography.hazmat.primitives.hashes</span> <span class="kn">import</span> <span class="n">Hash</span><span class="p">,</span> <span class="n">SHA1</span><span class="p">,</span> <span class="n">SHA256</span>
+<span class="kn">from</span> <span class="nn">cryptography.hazmat.primitives.hmac</span> <span class="kn">import</span> <span class="n">HMAC</span>
 
 <span class="k">def</span> <span class="nf">pad_pkcs7</span><span class="p">(</span><span class="n">text</span><span class="p">):</span>
     <span class="n">padder</span> <span class="o">=</span> <span class="n">padding</span><span class="o">.</span><span class="n">PKCS7</span><span class="p">(</span><span class="mi">128</span><span class="p">)</span><span class="o">.</span><span class="n">padder</span><span class="p">()</span>
@@ -14646,6 +14651,16 @@ body[data-format='mobile'] .jp-OutputArea-child .jp-OutputArea-output {
     <span class="n">h</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">h</span><span class="o">.</span><span class="n">finalize</span><span class="p">()</span>
 
+<span class="k">def</span> <span class="nf">sha256</span><span class="p">(</span><span class="n">message</span><span class="p">):</span>
+    <span class="n">h</span> <span class="o">=</span> <span class="n">Hash</span><span class="p">(</span><span class="n">SHA256</span><span class="p">())</span>
+    <span class="n">h</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">h</span><span class="o">.</span><span class="n">finalize</span><span class="p">()</span>
+
+<span class="k">def</span> <span class="nf">hmac_sha256</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">message</span><span class="p">):</span>
+    <span class="n">h</span> <span class="o">=</span> <span class="n">HMAC</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">SHA256</span><span class="p">())</span>
+    <span class="n">h</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">h</span><span class="o">.</span><span class="n">finalize</span><span class="p">()</span>
+
 <span class="k">def</span> <span class="nf">modexp</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">e</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>
     <span class="c1"># Compute (a**e)%n where e may be very large</span>
     <span class="n">r</span> <span class="o">=</span> <span class="mi">1</span>
@@ -14656,6 +14671,19 @@ body[data-format='mobile'] .jp-OutputArea-child .jp-OutputArea-output {
         <span class="n">p</span> <span class="o">=</span> <span class="p">(</span><span class="n">p</span><span class="o">*</span><span class="n">p</span><span class="p">)</span><span class="o">%</span><span class="k">n</span>
         <span class="n">e</span> <span class="o">&gt;&gt;=</span> <span class="mi">1</span>
     <span class="k">return</span> <span class="n">r</span>
+
+<span class="k">def</span> <span class="nf">i2b</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
+    <span class="c1"># Integer to bytes</span>
+    <span class="n">num_bytes</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">n</span><span class="o">.</span><span class="n">to_bytes</span><span class="p">(</span><span class="n">num_bytes</span><span class="p">,</span> <span class="s2">&quot;big&quot;</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">OverflowError</span><span class="p">:</span>
+            <span class="n">num_bytes</span> <span class="o">+=</span> <span class="mi">1</span>
+
+<span class="k">def</span> <span class="nf">b2i</span><span class="p">(</span><span class="n">b</span><span class="p">):</span>
+    <span class="c1"># Bytes to integer</span>
+    <span class="k">return</span> <span class="nb">int</span><span class="o">.</span><span class="n">from_bytes</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="s2">&quot;big&quot;</span><span class="p">)</span>
 </pre></div>
 
      </div>
@@ -14693,7 +14721,7 @@ g: 2
 <p>This is very easy to do in Python or Ruby or other high-level languages that auto-promote fixnums to bignums, but it isn't &quot;hard&quot; anywhere.</p>
 <p>Note that you'll need to write your own modexp (this is blackboard math, don't freak out), because you'll blow out your bignum library raising &quot;a&quot; to the 1024-bit-numberth power.  You can find modexp routines on Rosetta Code for most languages.</p>
 <hr />
-<p>The 1,536-bit prime <code>p</code> and generator value <code>g = 2</code> are among the various values recommended in <a href="https://datatracker.ietf.org/doc/html/rfc3526">RFC 3526</a>.  There does not seem to be a required size for the private key, but 256 bits appears as a recommendation in a few places.  That the session keys as generated by A and B are equal just follows from the law of exponents.</p>
+<p>The 1,536-bit prime <code>p</code> and generator value <code>g = 2</code> are among the various values recommended in <a href="https://datatracker.ietf.org/doc/html/rfc3526">RFC 3526</a>.  There does not seem to be a required size for the private key, but 256 bits appears as a recommendation in a few places.  That the session keys as generated by A and B are equal just follows from the law of exponents: $s = B^a = (g^b)^a = (g^a)^b = A^b$.</p>
 
 </div>
 </div>
@@ -14726,12 +14754,12 @@ g: 2
     <span class="n">K</span> <span class="o">=</span> <span class="n">modexp</span><span class="p">(</span><span class="n">generator</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">prime</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">k</span><span class="p">,</span> <span class="n">K</span>
 
-<span class="k">def</span> <span class="nf">package_session_key_value</span><span class="p">(</span><span class="n">value</span><span class="p">):</span>
-    <span class="k">return</span> <span class="n">sha1</span><span class="p">(</span><span class="n">value</span><span class="o">.</span><span class="n">to_bytes</span><span class="p">(</span><span class="mi">192</span><span class="p">,</span> <span class="s2">&quot;big&quot;</span><span class="p">))[:</span><span class="mi">16</span><span class="p">]</span>
+<span class="k">def</span> <span class="nf">key_value_to_bytes</span><span class="p">(</span><span class="n">s</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">sha1</span><span class="p">(</span><span class="n">i2b</span><span class="p">(</span><span class="n">s</span><span class="p">))[:</span><span class="mi">16</span><span class="p">]</span>
 
 <span class="k">def</span> <span class="nf">session_key</span><span class="p">(</span><span class="n">private_key</span><span class="p">,</span> <span class="n">public_key</span><span class="p">,</span> <span class="n">prime</span><span class="p">):</span>
     <span class="c1"># My private key, their public key</span>
-    <span class="k">return</span> <span class="n">package_session_key_value</span><span class="p">(</span><span class="n">modexp</span><span class="p">(</span><span class="n">public_key</span><span class="p">,</span> <span class="n">private_key</span><span class="p">,</span> <span class="n">prime</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">key_value_to_bytes</span><span class="p">(</span><span class="n">modexp</span><span class="p">(</span><span class="n">public_key</span><span class="p">,</span> <span class="n">private_key</span><span class="p">,</span> <span class="n">prime</span><span class="p">))</span>
 
 <span class="n">a</span><span class="p">,</span> <span class="n">A</span> <span class="o">=</span> <span class="n">generate_dh_keypair</span><span class="p">(</span><span class="n">P</span><span class="p">,</span> <span class="n">G</span><span class="p">)</span>
 <span class="n">b</span><span class="p">,</span> <span class="n">B</span> <span class="o">=</span> <span class="n">generate_dh_keypair</span><span class="p">(</span><span class="n">P</span><span class="p">,</span> <span class="n">G</span><span class="p">)</span>
@@ -14941,7 +14969,7 @@ Alice received: Alice says hi, Bob says hi back
         <span class="bp">self</span><span class="o">.</span><span class="n">generator</span> <span class="o">=</span> <span class="n">generator</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">private_key</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># arbitrary</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">public_key</span> <span class="o">=</span> <span class="n">prime</span>  <span class="c1"># the weird part</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">session_key</span> <span class="o">=</span> <span class="n">package_session_key_value</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">session_key</span> <span class="o">=</span> <span class="n">key_value_to_bytes</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">send_open_channel_request</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">downstream_person</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">send_open_channel_ack</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">upstream_person</span><span class="p">)</span>
 
@@ -15027,10 +15055,315 @@ g = p - 1
 <li>If $g = p$, then $A = B = s = 0$.</li>
 <li>If $g = p-1$, then $A = B = s = \pm 1$ depending on the evenness of private keys.</li>
 </ul>
+<h2 id="Challenge-36:-Implement-Secure-Remote-Password-(SRP)">Challenge 36: Implement Secure Remote Password (SRP)<a class="anchor-link" href="#Challenge-36:-Implement-Secure-Remote-Password-(SRP)">&#182;</a></h2><p>To understand SRP, look at how you generate an AES key from DH; now, just observe you can do the &quot;opposite&quot; operation and generate a numeric parameter from a hash.  Then:</p>
+<p>Replace A and B with C and S (client &amp; server)</p>
+<p><strong>C &amp; S</strong><br />
+Agree on N=[NIST Prime], g=2, k=3, I (email), P (password)</p>
+<p><strong>S</strong><br />
+1. Generate salt as random integer<br />
+2. Generate string xH=SHA256(salt|password)<br />
+3. Convert xH to integer x somehow (put 0x on hexdigest)<br />
+4. Generate v=g**x % N<br />
+5. Save everything but x, xH</p>
+<p><strong>C-&gt;S</strong><br />
+Send I, A=g**a % N (a la Diffie Hellman)</p>
+<p><strong>S-&gt;C</strong><br />
+Send salt, B=kv + g**b % N</p>
+<p><strong>S, C</strong><br />
+Compute string uH = SHA256(A|B), u = integer of uH</p>
+<p><strong>C</strong><br />
+1. Generate string xH=SHA256(salt|password)<br />
+2. Convert xH to integer x somehow (put 0x on hexdigest)<br />
+3. Generate S = (B - k * g**x)**(a + u * x) % N<br />
+4. Generate K = SHA256(S)</p>
+<p><strong>S</strong><br />
+1. Generate S = (A * v**u) ** b % N<br />
+2. Generate K = SHA256(S)</p>
+<p><strong>C-&gt;S</strong><br />
+Send HMAC-SHA256(K, salt)</p>
+<p><strong>S-&gt;C</strong><br />
+Send &quot;OK&quot; if HMAC-SHA256(K, salt) validates</p>
+<p>You're going to want to do this at a REPL of some sort; it may take a couple tries.</p>
+<p>It doesn't matter how you go from integer to string or string to integer (where things are going in or out of SHA256) as long as you do it consistently.  I tested by using the ASCII decimal representation of integers as input to SHA256, and by converting the hexdigest to an integer when processing its output.</p>
+<p>This is basically Diffie Hellman with a tweak of mixing the password into the public keys.  The server also takes an extra step to avoid storing an easily crackable password-equivalent.</p>
+<hr />
+<p>The phrasing of this challenge, specifically in that the client and server &quot;agree&quot; on password $P$, is a little odd because the entire point of SRP is that the client never sends the password to the server.  Instead, in a registration phase that is different from what is described above, the client sends just the identifying username $I$ and password verifier value $v$ to the server.  Typically the client would also create and send the salt at the same time, though the salt can in principle be created by either party as long as it is shared.  Either way, the server must return the salt during the login phase, as the client is not expected to remember it (the next challenge will take advantage of this fact).</p>
+<p>The math works out as follows.  Recall that $u$ is computed from the two public keys and $x$ is computed from the salt and password.  The client computes (this is all modulo $N$):</p>
+$$
+\begin{eqnarray*}
+S &amp;=&amp; (B-kv)^{a+ux} \\
+  &amp;=&amp; (B-kg^x)^{a+ux} \\
+  &amp;=&amp; (kv+g^b-kg^x)^{a+ux} \\
+  &amp;=&amp; (kg^x+g^b-kg^x)^{a+ux} \\
+  &amp;=&amp; (g^b)^{a+ux}
+\end{eqnarray*}
+$$<p>Notice how, as with just basic Diffie-Hellman,  the client is able to compute a quantity involving $b$ without knowing $b$, because $b$ is baked into $B$.  The server computes:</p>
+$$
+\begin{eqnarray*}
+S &amp;=&amp; (Av^u)^b \\
+  &amp;=&amp; (g^av^u)^b \\
+  &amp;=&amp; (g^a(g^x)^u)^b \\
+  &amp;=&amp; (g^b)^{a+ux}
+\end{eqnarray*}
+$$<p>Similarly, the server is able to compute a quantity involving $x$ and $a$ without knowing them, because they're baked into $v$ and $A$, respectively.</p>
 
 </div>
 </div>
 </div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell   ">
+<div class="jp-Cell-inputWrapper">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In&nbsp;[5]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+     <div class="CodeMirror cm-s-jupyter">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="n">N</span> <span class="o">=</span> <span class="n">P</span>
+<span class="n">K</span> <span class="o">=</span> <span class="mi">3</span>
+
+<span class="c1"># In the following:</span>
+<span class="c1">#</span>
+<span class="c1"># a, A: client private/public keypair</span>
+<span class="c1"># b, B: server private/public keypair (B tweaked)</span>
+<span class="c1"># v: password verifier value</span>
+
+<span class="k">class</span> <span class="nc">Client</span><span class="p">:</span>
+
+    <span class="k">def</span> <span class="nf">compute_xv</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">salt</span><span class="p">,</span> <span class="n">password</span><span class="p">):</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">b2i</span><span class="p">(</span><span class="n">sha256</span><span class="p">(</span><span class="n">i2b</span><span class="p">(</span><span class="n">salt</span><span class="p">)</span> <span class="o">+</span> <span class="n">password</span><span class="p">))</span>
+        <span class="n">v</span> <span class="o">=</span> <span class="n">modexp</span><span class="p">(</span><span class="n">G</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">N</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">x</span><span class="p">,</span> <span class="n">v</span>
+
+    <span class="k">def</span> <span class="nf">register_with_server</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">server</span><span class="p">,</span> <span class="n">username</span><span class="p">,</span> <span class="n">password</span><span class="p">):</span>
+        <span class="n">salt</span> <span class="o">=</span> <span class="n">randint</span><span class="p">(</span><span class="mi">2</span><span class="o">**</span><span class="mi">255</span><span class="p">,</span> <span class="mi">2</span><span class="o">**</span><span class="mi">256</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">_</span><span class="p">,</span> <span class="n">v</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">compute_xv</span><span class="p">(</span><span class="n">salt</span><span class="p">,</span> <span class="n">password</span><span class="p">)</span>
+        <span class="n">server</span><span class="o">.</span><span class="n">register_user</span><span class="p">(</span><span class="n">username</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">salt</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">login</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">server</span><span class="p">,</span> <span class="n">username</span><span class="p">,</span> <span class="n">password</span><span class="p">):</span>
+        <span class="n">a</span><span class="p">,</span> <span class="n">A</span> <span class="o">=</span> <span class="n">generate_dh_keypair</span><span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">G</span><span class="p">)</span>
+        <span class="n">B</span><span class="p">,</span> <span class="n">salt</span> <span class="o">=</span> <span class="n">server</span><span class="o">.</span><span class="n">initiate_login</span><span class="p">(</span><span class="n">username</span><span class="p">,</span> <span class="n">A</span><span class="p">)</span>
+        <span class="n">u</span> <span class="o">=</span> <span class="n">b2i</span><span class="p">(</span><span class="n">sha256</span><span class="p">(</span><span class="n">i2b</span><span class="p">(</span><span class="n">A</span><span class="p">)</span> <span class="o">+</span> <span class="n">i2b</span><span class="p">(</span><span class="n">B</span><span class="p">)))</span>
+        <span class="n">x</span><span class="p">,</span> <span class="n">v</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">compute_xv</span><span class="p">(</span><span class="n">salt</span><span class="p">,</span> <span class="n">password</span><span class="p">)</span>
+        <span class="n">S</span> <span class="o">=</span> <span class="n">modexp</span><span class="p">(</span><span class="n">B</span><span class="o">-</span><span class="n">K</span><span class="o">*</span><span class="n">v</span><span class="p">,</span> <span class="n">a</span><span class="o">+</span><span class="n">u</span><span class="o">*</span><span class="n">x</span><span class="p">,</span> <span class="n">N</span><span class="p">)</span>
+        <span class="n">key</span> <span class="o">=</span> <span class="n">sha256</span><span class="p">(</span><span class="n">i2b</span><span class="p">(</span><span class="n">S</span><span class="p">))</span>
+        <span class="n">hmac</span> <span class="o">=</span> <span class="n">hmac_sha256</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">i2b</span><span class="p">(</span><span class="n">salt</span><span class="p">))</span>
+        <span class="n">keys_match</span> <span class="o">=</span> <span class="n">server</span><span class="o">.</span><span class="n">complete_login</span><span class="p">(</span><span class="n">username</span><span class="p">,</span> <span class="n">hmac</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Login </span><span class="si">{</span><span class="s1">&#39;&#39;</span> <span class="k">if</span> <span class="n">keys_match</span> <span class="k">else</span> <span class="s1">&#39;un&#39;</span><span class="si">}</span><span class="s2">successful&quot;</span><span class="p">)</span>
+
+<span class="k">class</span> <span class="nc">Server</span><span class="p">:</span>
+
+    <span class="k">class</span> <span class="nc">UserRecord</span><span class="p">:</span>
+        <span class="c1"># Admittedly, this class is a hodge-podge of persistent</span>
+        <span class="c1"># information (v, salt) and transactional information</span>
+        <span class="c1"># (A, b, B).</span>
+        <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">salt</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">v</span> <span class="o">=</span> <span class="n">v</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">salt</span> <span class="o">=</span> <span class="n">salt</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">A</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">b</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">B</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">users</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">def</span> <span class="nf">register_user</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">username</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">salt</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">users</span><span class="p">[</span><span class="n">username</span><span class="p">]</span> <span class="o">=</span> <span class="n">Server</span><span class="o">.</span><span class="n">UserRecord</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">salt</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">initiate_login</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">username</span><span class="p">,</span> <span class="n">A</span><span class="p">):</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">users</span><span class="p">[</span><span class="n">username</span><span class="p">]</span>
+        <span class="n">r</span><span class="o">.</span><span class="n">A</span> <span class="o">=</span> <span class="n">A</span>
+        <span class="n">r</span><span class="o">.</span><span class="n">b</span><span class="p">,</span> <span class="n">r</span><span class="o">.</span><span class="n">B</span> <span class="o">=</span> <span class="n">generate_dh_keypair</span><span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">G</span><span class="p">)</span>
+        <span class="c1"># Tweak added to basic Diffie-Hellman</span>
+        <span class="n">r</span><span class="o">.</span><span class="n">B</span> <span class="o">=</span> <span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">B</span> <span class="o">+</span> <span class="n">K</span><span class="o">*</span><span class="n">r</span><span class="o">.</span><span class="n">v</span><span class="p">)</span><span class="o">%</span><span class="k">N</span>
+        <span class="k">return</span> <span class="n">r</span><span class="o">.</span><span class="n">B</span><span class="p">,</span> <span class="n">r</span><span class="o">.</span><span class="n">salt</span>
+
+    <span class="k">def</span> <span class="nf">complete_login</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">username</span><span class="p">,</span> <span class="n">client_hmac</span><span class="p">):</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">users</span><span class="p">[</span><span class="n">username</span><span class="p">]</span>
+        <span class="n">u</span> <span class="o">=</span> <span class="n">b2i</span><span class="p">(</span><span class="n">sha256</span><span class="p">(</span><span class="n">i2b</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">A</span><span class="p">)</span> <span class="o">+</span> <span class="n">i2b</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">B</span><span class="p">)))</span>
+        <span class="n">S</span> <span class="o">=</span> <span class="n">modexp</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">A</span><span class="o">*</span><span class="n">modexp</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">v</span><span class="p">,</span> <span class="n">u</span><span class="p">,</span> <span class="n">N</span><span class="p">),</span> <span class="n">r</span><span class="o">.</span><span class="n">b</span><span class="p">,</span> <span class="n">N</span><span class="p">)</span>
+        <span class="n">key</span> <span class="o">=</span> <span class="n">sha256</span><span class="p">(</span><span class="n">i2b</span><span class="p">(</span><span class="n">S</span><span class="p">))</span>
+        <span class="n">server_hmac</span> <span class="o">=</span> <span class="n">hmac_sha256</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">i2b</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">salt</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">client_hmac</span> <span class="o">==</span> <span class="n">server_hmac</span>
+
+<span class="n">C</span> <span class="o">=</span> <span class="n">Client</span><span class="p">()</span>
+<span class="n">S</span> <span class="o">=</span> <span class="n">Server</span><span class="p">()</span>
+<span class="n">C</span><span class="o">.</span><span class="n">register_with_server</span><span class="p">(</span><span class="n">S</span><span class="p">,</span> <span class="sa">b</span><span class="s2">&quot;gjanee&quot;</span><span class="p">,</span> <span class="sa">b</span><span class="s2">&quot;2secret4u&quot;</span><span class="p">)</span>
+
+<span class="c1"># Check that authentication works</span>
+<span class="n">C</span><span class="o">.</span><span class="n">login</span><span class="p">(</span><span class="n">S</span><span class="p">,</span> <span class="sa">b</span><span class="s2">&quot;gjanee&quot;</span><span class="p">,</span> <span class="sa">b</span><span class="s2">&quot;2secret4u&quot;</span><span class="p">)</span>
+
+<span class="c1"># For good measure, check that authentication fails when it should</span>
+<span class="n">C</span><span class="o">.</span><span class="n">login</span><span class="p">(</span><span class="n">S</span><span class="p">,</span> <span class="sa">b</span><span class="s2">&quot;gjanee&quot;</span><span class="p">,</span> <span class="sa">b</span><span class="s2">&quot;wrong password&quot;</span><span class="p">)</span>
+</pre></div>
+
+     </div>
+</div>
+</div>
+</div>
+
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+
+
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+    
+    <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+
+
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain">
+<pre>Login successful
+Login unsuccessful
+</pre>
+</div>
+</div>
+
+</div>
+
+</div>
+
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
+<div class="jp-Cell-inputWrapper">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput " data-mime-type="text/markdown">
+<h2 id="Challenge-37:-Break-SRP-with-a-zero-key">Challenge 37: Break SRP with a zero key<a class="anchor-link" href="#Challenge-37:-Break-SRP-with-a-zero-key">&#182;</a></h2><p>Get your SRP working in an actual client-server setting.  &quot;Log in&quot; with a valid password using the protocol.</p>
+<p>Now log in without your password by having the client send 0 as its &quot;A&quot; value.  What does this do to the &quot;S&quot; value that both sides compute?</p>
+<p>Now log in without your password by having the client send N, N*2, &amp;c.</p>
+<blockquote>
+<p><strong>Cryptanalytic MVP award</strong></p>
+<p>Trevor Perrin and Nate Lawson taught us this attack 7 years ago.  It is excellent.  Attacks on DH are tricky to &quot;operationalize&quot;.  But this attack uses the same concepts, and results in auth bypass.  Almost every implementation of SRP we've ever seen has this flaw; if you see a new one, go look for this bug.</p>
+</blockquote>
+<hr />
+<p>If $A \equiv 0 \bmod N$ then the server computes $S = 0$ and key $K$ is the hash of $0$.  Recall our observation in the previous challenge that the server supplies the salt.  Thus the client can trivially compute <code>HMAC-SHA256(0, salt)</code> and pass the authentication test and, armed with the key, communicate with the server.</p>
+<h2 id="Challenge-38:-Offline-dictionary-attack-on-simplified-SRP">Challenge 38: Offline dictionary attack on simplified SRP<a class="anchor-link" href="#Challenge-38:-Offline-dictionary-attack-on-simplified-SRP">&#182;</a></h2><p><strong>S</strong><br />
+x = SHA256(salt|password)<br />
+v = g**x % n</p>
+<p><strong>C-&gt;S</strong><br />
+I, A = g**a % n</p>
+<p><strong>S-&gt;C</strong><br />
+salt, B = g**b % n, u = 128 bit random number</p>
+<p><strong>C</strong><br />
+x = SHA256(salt|password)<br />
+S = B**(a + ux) % n<br />
+K = SHA256(S)</p>
+<p><strong>S</strong><br />
+S = (A * v ** u)**b % n<br />
+K = SHA256(S)</p>
+<p><strong>C-&gt;S</strong><br />
+Send HMAC-SHA256(K, salt)</p>
+<p><strong>S-&gt;C</strong><br />
+Send &quot;OK&quot; if HMAC-SHA256(K, salt) validates</p>
+<p>Note that in this protocol, the server's &quot;B&quot; parameter doesn't depend on the password (it's just a Diffie Hellman public key).</p>
+<p>Make sure the protocol works given a valid password.</p>
+<p>Now, run the protocol as a MITM attacker: pose as the server and use arbitrary values for b, B, u, and salt.</p>
+<p>Crack the password from A's HMAC-SHA256(K, salt).</p>
+<hr />
+<p>This challenge highlights that the use of salts does not protect against an offline dictionary attack by a man-in-the-middle.  Salts are stored by the server and presented to the client, and hence are ultimately controlled by the server.  So in the above scenario, an attacker can pick a (single) arbitrary salt value, and precompute $x$ (and from there $v$) for an entire dictionary of possible passwords, and then compare HMACs upon login attempt.  SRP protects against this by incorporating $x$ into the computation of $B$ (and the client assumes that $x$ has been so incorporated, and its computation of the key and HMAC assume that this has been done).</p>
+
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell   ">
+<div class="jp-Cell-inputWrapper">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In&nbsp;[6]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+     <div class="CodeMirror cm-s-jupyter">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="n">K</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># Effectively remove K from computation</span>
+
+<span class="c1"># From https://en.wikipedia.org/wiki/List_of_the_most_common_passwords</span>
+<span class="n">most_common_passwords</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="sa">b</span><span class="s2">&quot;123456&quot;</span><span class="p">,</span>
+    <span class="sa">b</span><span class="s2">&quot;123456789&quot;</span><span class="p">,</span>
+    <span class="sa">b</span><span class="s2">&quot;12345&quot;</span><span class="p">,</span>
+    <span class="sa">b</span><span class="s2">&quot;qwerty&quot;</span><span class="p">,</span>
+    <span class="sa">b</span><span class="s2">&quot;password&quot;</span><span class="p">,</span>
+    <span class="sa">b</span><span class="s2">&quot;12345678&quot;</span><span class="p">,</span>
+    <span class="sa">b</span><span class="s2">&quot;111111&quot;</span><span class="p">,</span>
+    <span class="sa">b</span><span class="s2">&quot;123123&quot;</span><span class="p">,</span>
+    <span class="sa">b</span><span class="s2">&quot;1234567890&quot;</span><span class="p">,</span>
+    <span class="sa">b</span><span class="s2">&quot;1234567&quot;</span><span class="p">,</span>
+    <span class="sa">b</span><span class="s2">&quot;qwerty123&quot;</span><span class="p">,</span>
+    <span class="sa">b</span><span class="s2">&quot;000000&quot;</span><span class="p">,</span>
+    <span class="sa">b</span><span class="s2">&quot;1q2w3e&quot;</span><span class="p">,</span>
+    <span class="sa">b</span><span class="s2">&quot;aa12345678&quot;</span><span class="p">,</span>
+    <span class="sa">b</span><span class="s2">&quot;abc123&quot;</span><span class="p">,</span>
+    <span class="sa">b</span><span class="s2">&quot;password1&quot;</span><span class="p">,</span>
+    <span class="sa">b</span><span class="s2">&quot;1234&quot;</span><span class="p">,</span>
+    <span class="sa">b</span><span class="s2">&quot;qwertyuiop&quot;</span><span class="p">,</span>
+    <span class="sa">b</span><span class="s2">&quot;123321&quot;</span><span class="p">,</span>
+    <span class="sa">b</span><span class="s2">&quot;password123&quot;</span>
+<span class="p">]</span>
+
+<span class="k">class</span> <span class="nc">FauxServer</span><span class="p">(</span><span class="n">Server</span><span class="p">):</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="c1"># Two tweaks: we use a fixed salt value, and we ignore the</span>
+        <span class="c1"># password verifier value sent by the client.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">fixed_salt</span> <span class="o">=</span> <span class="n">randint</span><span class="p">(</span><span class="mi">2</span><span class="o">**</span><span class="mi">255</span><span class="p">,</span> <span class="mi">2</span><span class="o">**</span><span class="mi">256</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">users</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">Server</span><span class="o">.</span><span class="n">UserRecord</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">fixed_salt</span><span class="p">))</span>
+        <span class="c1"># Precompute a dictionary.</span>
+        <span class="k">def</span> <span class="nf">compute_v</span><span class="p">(</span><span class="n">password</span><span class="p">):</span>
+            <span class="n">x</span> <span class="o">=</span> <span class="n">b2i</span><span class="p">(</span><span class="n">sha256</span><span class="p">(</span><span class="n">i2b</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fixed_salt</span><span class="p">)</span> <span class="o">+</span> <span class="n">password</span><span class="p">))</span>
+            <span class="k">return</span> <span class="n">modexp</span><span class="p">(</span><span class="n">G</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">N</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">passwords</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="n">pw</span><span class="p">:</span> <span class="n">compute_v</span><span class="p">(</span><span class="n">pw</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">pw</span> <span class="ow">in</span> <span class="n">most_common_passwords</span>
+        <span class="p">}</span>
+
+    <span class="k">def</span> <span class="nf">register_user</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">username</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">salt</span><span class="p">):</span>
+        <span class="k">pass</span>
+
+    <span class="k">def</span> <span class="nf">complete_login</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">username</span><span class="p">,</span> <span class="n">client_hmac</span><span class="p">):</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">users</span><span class="p">[</span><span class="n">username</span><span class="p">]</span>
+        <span class="n">u</span> <span class="o">=</span> <span class="n">b2i</span><span class="p">(</span><span class="n">sha256</span><span class="p">(</span><span class="n">i2b</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">A</span><span class="p">)</span> <span class="o">+</span> <span class="n">i2b</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">B</span><span class="p">)))</span>
+        <span class="k">for</span> <span class="n">pw</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">passwords</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">S</span> <span class="o">=</span> <span class="n">modexp</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">A</span><span class="o">*</span><span class="n">modexp</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">u</span><span class="p">,</span> <span class="n">N</span><span class="p">),</span> <span class="n">r</span><span class="o">.</span><span class="n">b</span><span class="p">,</span> <span class="n">N</span><span class="p">)</span>
+            <span class="n">key</span> <span class="o">=</span> <span class="n">sha256</span><span class="p">(</span><span class="n">i2b</span><span class="p">(</span><span class="n">S</span><span class="p">))</span>
+            <span class="n">server_hmac</span> <span class="o">=</span> <span class="n">hmac_sha256</span><span class="p">(</span><span class="n">key</span><span class="p">,</span> <span class="n">i2b</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fixed_salt</span><span class="p">))</span>
+            <span class="k">if</span> <span class="n">server_hmac</span> <span class="o">==</span> <span class="n">client_hmac</span><span class="p">:</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;MITM: password is &#39;</span><span class="si">{</span><span class="n">pw</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s1">&#39;ASCII&#39;</span><span class="p">)</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+                <span class="k">return</span> <span class="kc">True</span>
+        <span class="k">return</span> <span class="kc">False</span>
+
+<span class="n">C</span> <span class="o">=</span> <span class="n">Client</span><span class="p">()</span>
+<span class="n">S</span> <span class="o">=</span> <span class="n">FauxServer</span><span class="p">()</span>
+<span class="n">C</span><span class="o">.</span><span class="n">login</span><span class="p">(</span><span class="n">S</span><span class="p">,</span> <span class="sa">b</span><span class="s2">&quot;gjanee&quot;</span><span class="p">,</span> <span class="n">choice</span><span class="p">(</span><span class="n">most_common_passwords</span><span class="p">))</span>
+</pre></div>
+
+     </div>
+</div>
+</div>
+</div>
+
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+
+
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+    
+    <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+
+
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain">
+<pre>MITM: password is &#39;111111&#39;
+Login successful
+</pre>
+</div>
+</div>
+
+</div>
+
+</div>
+
 </div>
 </body>
 
