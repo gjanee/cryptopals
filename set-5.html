@@ -14608,6 +14608,8 @@ body[data-format='mobile'] .jp-OutputArea-child .jp-OutputArea-output {
 <li><a href="#Challenge-36:-Implement-Secure-Remote-Password-(SRP)">Challenge 36: Implement Secure Remote Password (SRP)</a></li>
 <li><a href="#Challenge-37:-Break-SRP-with-a-zero-key">Challenge 37: Break SRP with a zero key</a></li>
 <li><a href="#Challenge-38:-Offline-dictionary-attack-on-simplified-SRP">Challenge 38: Offline dictionary attack on simplified SRP</a></li>
+<li><a href="#Challenge-39:-Implement-RSA">Challenge 39: Implement RSA</a></li>
+<li><a href="#Challenge-40:-Implement-an-E=3-RSA-Broadcast-attack">Challenge 40: Implement an E=3 RSA Broadcast attack</a></li>
 </ul>
 <h2 id="Preliminaries">Preliminaries<a class="anchor-link" href="#Preliminaries">&#182;</a></h2>
 </div>
@@ -14671,6 +14673,20 @@ body[data-format='mobile'] .jp-OutputArea-child .jp-OutputArea-output {
         <span class="n">p</span> <span class="o">=</span> <span class="p">(</span><span class="n">p</span><span class="o">*</span><span class="n">p</span><span class="p">)</span><span class="o">%</span><span class="k">n</span>
         <span class="n">e</span> <span class="o">&gt;&gt;=</span> <span class="mi">1</span>
     <span class="k">return</span> <span class="n">r</span>
+
+<span class="k">def</span> <span class="nf">modinv</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>
+    <span class="c1"># Inverse of a modulo n (extended Euclidean algorithm)</span>
+    <span class="n">t</span><span class="p">,</span> <span class="n">new_t</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span>
+    <span class="n">r</span><span class="p">,</span> <span class="n">new_r</span> <span class="o">=</span> <span class="n">n</span><span class="p">,</span> <span class="n">a</span>
+    <span class="k">while</span> <span class="n">new_r</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">q</span> <span class="o">=</span> <span class="n">r</span><span class="o">//</span><span class="n">new_r</span>
+        <span class="n">t</span><span class="p">,</span> <span class="n">new_t</span> <span class="o">=</span> <span class="n">new_t</span><span class="p">,</span> <span class="n">t</span><span class="o">-</span><span class="n">q</span><span class="o">*</span><span class="n">new_t</span>
+        <span class="n">r</span><span class="p">,</span> <span class="n">new_r</span> <span class="o">=</span> <span class="n">new_r</span><span class="p">,</span> <span class="n">r</span><span class="o">-</span><span class="n">q</span><span class="o">*</span><span class="n">new_r</span>
+    <span class="k">if</span> <span class="n">r</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ZeroDivisionError</span><span class="p">(</span><span class="s2">&quot;no modular inverse&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">t</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">t</span> <span class="o">+=</span> <span class="n">n</span>
+    <span class="k">return</span> <span class="n">t</span>
 
 <span class="k">def</span> <span class="nf">i2b</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
     <span class="c1"># Integer to bytes</span>
@@ -15354,10 +15370,247 @@ Send &quot;OK&quot; if HMAC-SHA256(K, salt) validates</p>
 
 
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain">
-<pre>MITM: password is &#39;111111&#39;
+<pre>MITM: password is &#39;123321&#39;
 Login successful
 </pre>
 </div>
+</div>
+
+</div>
+
+</div>
+
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
+<div class="jp-Cell-inputWrapper">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput " data-mime-type="text/markdown">
+<h2 id="Challenge-39:-Implement-RSA">Challenge 39: Implement RSA<a class="anchor-link" href="#Challenge-39:-Implement-RSA">&#182;</a></h2><p>There are two annoying things about implementing RSA.  Both of them involve key generation; the actual encryption/decryption in RSA is trivial.</p>
+<p>First, you need to generate random primes.  You can't just agree on a prime ahead of time, like you do in DH.  You can write this algorithm yourself, but I just cheat and use OpenSSL's BN library to do the work.</p>
+<p>The second is that you need an &quot;invmod&quot; operation (the multiplicative inverse), which is not an operation that is wired into your language.  The algorithm is just a couple lines, but I always lose an hour getting it to work.</p>
+<p>I recommend you not bother with primegen, but do take the time to get your own EGCD and invmod algorithm working.</p>
+<p>Now:</p>
+<ul>
+<li>Generate 2 random primes.  We'll use small numbers to start, so you can just pick them out of a prime table. Call them &quot;p&quot; and &quot;q&quot;.</li>
+<li>Let n be p * q.  Your RSA math is modulo n.</li>
+<li>Let et be (p-1)*(q-1) (the &quot;totient&quot;).  You need this value only for keygen.</li>
+<li>Let e be 3.</li>
+<li>Compute d = invmod(e, et).  invmod(17, 3120) is 2753.</li>
+<li>Your public key is [e, n].  Your private key is [d, n].</li>
+<li>To encrypt: c = m**e%n.  To decrypt: m = c**d%n</li>
+<li>Test this out with a number, like &quot;42&quot;.</li>
+<li>Repeat with bignum primes (keep e=3).</li>
+</ul>
+<p>Finally, to encrypt a string, do something cheesy, like convert the string to hex and put &quot;0x&quot; on the front of it to turn it into a number.  The math cares not how stupidly you feed it strings.</p>
+<hr />
+<p>In the RSA algorithm, as described here and elsewhere, primes $p$ and $q$ are chosen first, and are randomly chosen but otherwise arbitrary, and <em>then</em> exponent $e$ is chosen as any value that is coprime to $(p-1)(q-1)$.  However, there are two nuances.  First, the primes are not arbitrary, but in actual practice must be chosen with care.  As the authors note in their <a href="https://web.archive.org/web/20230127011251/http://people.csail.mit.edu/rivest/Rsapaper.pdf">original paper</a>, &quot;To gain additional protection against sophisticated factoring algorithms, $p$ and $q$ should differ in length by a few digits, both $(p-1)$ and $(q-1)$ should contain large prime factors, and $\gcd(p-1, q-1)$ should be small.&quot;  Second, $e$ is not as arbitrary as it sounds either.  We are given $e = 3$ here, but generally there are recommendations that $e$ be a &quot;small&quot; Fermat prime (i.e., of the form $2^{2^n}+1$) of which there are only a few.  So it seems that $p$ and $q$ must be random but also chosen such that $p-1$ and $q-1$ are coprime to an already-chosen $e$.  Our code below does this.</p>
+<p>As for size recommendations, these have changed over time as computing power has increased.  The aforementioned paper recommends 100-digit (~330-bit) primes, but nowadays (see, e.g., <a href="https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.186-5.pdf">FIPS 186-5: Digital Signature Standard</a>) 1,024-bit primes (yielding a 2,048-bit modulus) are recommended.</p>
+
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell   ">
+<div class="jp-Cell-inputWrapper">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In&nbsp;[7]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+     <div class="CodeMirror cm-s-jupyter">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="k">def</span> <span class="nf">is_prime</span><span class="p">(</span><span class="n">n</span><span class="p">,</span> <span class="n">rounds</span><span class="o">=</span><span class="mi">40</span><span class="p">):</span>
+    <span class="c1"># Miller-Rabin primality test for n &gt;= 2</span>
+    <span class="k">if</span> <span class="n">n</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span> <span class="k">return</span> <span class="kc">False</span>
+    <span class="k">if</span> <span class="n">n</span> <span class="o">&lt;=</span> <span class="mi">3</span><span class="p">:</span> <span class="k">return</span> <span class="kc">True</span>
+    <span class="k">if</span> <span class="n">n</span><span class="o">%</span><span class="k">2</span> == 0: return False
+    <span class="n">s</span><span class="p">,</span> <span class="n">d</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">n</span><span class="o">-</span><span class="mi">1</span>
+    <span class="k">while</span> <span class="n">d</span><span class="o">%</span><span class="k">2</span> == 0:
+        <span class="n">s</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="n">d</span> <span class="o">//=</span> <span class="mi">2</span>
+    <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">rounds</span><span class="p">):</span>
+        <span class="n">a</span> <span class="o">=</span> <span class="n">randint</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">n</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">modexp</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">d</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">s</span><span class="p">):</span>
+            <span class="n">y</span> <span class="o">=</span> <span class="n">modexp</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">y</span> <span class="o">==</span> <span class="mi">1</span> <span class="ow">and</span> <span class="n">x</span> <span class="o">!=</span> <span class="mi">1</span> <span class="ow">and</span> <span class="n">x</span> <span class="o">!=</span> <span class="n">n</span><span class="o">-</span><span class="mi">1</span><span class="p">:</span>
+                <span class="k">return</span> <span class="kc">False</span>
+            <span class="n">x</span> <span class="o">=</span> <span class="n">y</span>
+        <span class="k">if</span> <span class="n">y</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+    <span class="k">return</span> <span class="kc">True</span>
+
+<span class="k">def</span> <span class="nf">random_rsa_prime</span><span class="p">(</span><span class="n">num_bits</span><span class="p">,</span> <span class="n">e</span><span class="p">):</span>
+    <span class="c1"># Return prime p such that gcd(p-1, e) == 0</span>
+    <span class="n">n</span> <span class="o">=</span> <span class="n">randint</span><span class="p">(</span><span class="mi">2</span><span class="o">**</span><span class="p">(</span><span class="n">num_bits</span><span class="o">-</span><span class="mi">1</span><span class="p">),</span> <span class="mi">2</span><span class="o">**</span><span class="n">num_bits</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">n</span><span class="o">%</span><span class="k">2</span> == 0:
+        <span class="n">n</span> <span class="o">+=</span> <span class="mi">1</span>
+    <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+        <span class="k">if</span> <span class="p">(</span><span class="n">n</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">%</span><span class="k">e</span> != 0:
+            <span class="k">if</span> <span class="n">is_prime</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
+                <span class="k">return</span> <span class="n">n</span>
+        <span class="n">n</span> <span class="o">+=</span> <span class="mi">2</span>
+
+<span class="c1"># N.B.: `ptext` and `ctext` are integers in the following</span>
+
+<span class="k">def</span> <span class="nf">rsa_encrypt</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">ptext</span><span class="p">):</span>
+    <span class="k">assert</span> <span class="n">ptext</span> <span class="o">&lt;</span> <span class="n">n</span>
+    <span class="k">return</span> <span class="n">modexp</span><span class="p">(</span><span class="n">ptext</span><span class="p">,</span> <span class="n">e</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span>
+
+<span class="k">def</span> <span class="nf">rsa_decrypt</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">ctext</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">modexp</span><span class="p">(</span><span class="n">ctext</span><span class="p">,</span> <span class="n">d</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span>
+
+<span class="n">e</span> <span class="o">=</span> <span class="mi">3</span>
+<span class="n">p</span> <span class="o">=</span> <span class="n">random_rsa_prime</span><span class="p">(</span><span class="mi">1024</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
+<span class="n">q</span> <span class="o">=</span> <span class="n">random_rsa_prime</span><span class="p">(</span><span class="mi">1024</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
+<span class="n">n</span> <span class="o">=</span> <span class="n">p</span><span class="o">*</span><span class="n">q</span>
+<span class="n">et</span> <span class="o">=</span> <span class="p">(</span><span class="n">p</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">*</span><span class="p">(</span><span class="n">q</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">d</span> <span class="o">=</span> <span class="n">modinv</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="n">et</span><span class="p">)</span>
+
+<span class="c1"># Try it out</span>
+<span class="n">message</span> <span class="o">=</span> <span class="n">b2i</span><span class="p">(</span><span class="sa">b</span><span class="s2">&quot;A second lamp in the belfry burns!&quot;</span><span class="p">)</span>
+<span class="n">rsa_decrypt</span><span class="p">(</span><span class="n">d</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">rsa_encrypt</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">message</span><span class="p">))</span> <span class="o">==</span> <span class="n">message</span>
+</pre></div>
+
+     </div>
+</div>
+</div>
+</div>
+
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+
+
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child jp-OutputArea-executeResult">
+    
+    <div class="jp-OutputPrompt jp-OutputArea-prompt">Out[7]:</div>
+
+
+
+
+<div class="jp-RenderedText jp-OutputArea-output jp-OutputArea-executeResult" data-mime-type="text/plain">
+<pre>True</pre>
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell">
+<div class="jp-Cell-inputWrapper">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput " data-mime-type="text/markdown">
+<h2 id="Challenge-40:-Implement-an-E=3-RSA-Broadcast-attack">Challenge 40: Implement an E=3 RSA Broadcast attack<a class="anchor-link" href="#Challenge-40:-Implement-an-E=3-RSA-Broadcast-attack">&#182;</a></h2><p>Assume you're a Javascript programmer.  That is, you're using a naive handrolled RSA to encrypt without padding.</p>
+<p>Assume you can be coerced into encrypting the same plaintext three times, under three different public keys.  You can; it's happened.</p>
+<p>Then an attacker can trivially decrypt your message, by:</p>
+<ol>
+<li>Capturing any 3 of the ciphertexts and their corresponding pubkeys</li>
+<li>Using the CRT to solve for the number represented by the three ciphertexts (which are residues mod their respective pubkeys)</li>
+<li>Taking the cube root of the resulting number</li>
+</ol>
+<p>The CRT says you can take any number and represent it as the combination of a series of residues mod a series of moduli.  In the three-residue case, you have:</p>
+<pre><code>result =
+  (c_0 * m_s_0 * invmod(m_s_0, n_0)) +
+  (c_1 * m_s_1 * invmod(m_s_1, n_1)) +
+  (c_2 * m_s_2 * invmod(m_s_2, n_2)) mod N_012
+</code></pre>
+<p>where:</p>
+<pre><code>c_0, c_1, c_2 are the three respective residues mod
+n_0, n_1, n_2
+
+m_s_n (for n in 0, 1, 2) are the product of the moduli
+EXCEPT n_n --- ie, m_s_1 is n_0 * n_2
+
+N_012 is the product of all three moduli
+</code></pre>
+<p>To decrypt RSA using a simple cube root, leave off the final modulus operation; just take the raw accumulated result and cube-root it.</p>
+<hr />
+<p>For plaintext $p$ and exponent $e=3$, we're given</p>
+$$
+\begin{eqnarray*}
+c_0 &amp;=&amp; p^3 \bmod n_0 \\
+c_1 &amp;=&amp; p^3 \bmod n_1 \\
+c_2 &amp;=&amp; p^3 \bmod n_2 \\
+\end{eqnarray*}
+$$<p>The Chinese Remainder Theorem gives us $p^3 \bmod n_0 n_1 n_2$.  Since $p &lt; \{n_0, n_1, n_2\}$, then $p^3 &lt; n_0 n_1 n_2$ and we are justified in recovering $p$ by taking the cube root of the value that results from the modulus operation with $n_0 n_1 n_2$.  And this is the subtle reason why we needed to start with (at least) 3 ciphertexts.  With only two ciphertexts, and with $e=3$, the Chinese Remainder Theorem would give us $p^3 \bmod n_0 n_1$ and it would not necessarily be the case that $p^3 &lt; n_0 n_1$.</p>
+
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell   ">
+<div class="jp-Cell-inputWrapper">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In&nbsp;[8]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+     <div class="CodeMirror cm-s-jupyter">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="k">def</span> <span class="nf">integer_cube_root</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+    <span class="c1"># For positive x</span>
+    <span class="k">def</span> <span class="nf">f</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">n</span><span class="o">**</span><span class="mi">3</span>
+    <span class="n">r</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="k">while</span> <span class="n">f</span><span class="p">(</span><span class="n">r</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="n">x</span><span class="p">:</span>
+        <span class="n">r</span> <span class="o">*=</span> <span class="mi">2</span>
+    <span class="n">l</span> <span class="o">=</span> <span class="n">r</span><span class="o">//</span><span class="mi">2</span>
+    <span class="k">while</span> <span class="n">l</span> <span class="o">&lt;=</span> <span class="n">r</span><span class="p">:</span>
+        <span class="n">m</span> <span class="o">=</span> <span class="p">(</span><span class="n">l</span><span class="o">+</span><span class="n">r</span><span class="p">)</span><span class="o">//</span><span class="mi">2</span>
+        <span class="k">if</span> <span class="n">f</span><span class="p">(</span><span class="n">m</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">x</span><span class="p">:</span>
+            <span class="n">l</span> <span class="o">=</span> <span class="n">m</span><span class="o">+</span><span class="mi">1</span>
+        <span class="k">elif</span> <span class="n">f</span><span class="p">(</span><span class="n">m</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">x</span><span class="p">:</span>
+            <span class="n">r</span> <span class="o">=</span> <span class="n">m</span><span class="o">-</span><span class="mi">1</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">m</span>
+    <span class="k">return</span> <span class="kc">None</span>
+
+<span class="n">n0</span> <span class="o">=</span> <span class="n">random_rsa_prime</span><span class="p">(</span><span class="mi">1024</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span> <span class="o">*</span> <span class="n">random_rsa_prime</span><span class="p">(</span><span class="mi">1024</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
+<span class="n">n1</span> <span class="o">=</span> <span class="n">random_rsa_prime</span><span class="p">(</span><span class="mi">1024</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span> <span class="o">*</span> <span class="n">random_rsa_prime</span><span class="p">(</span><span class="mi">1024</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
+<span class="n">n2</span> <span class="o">=</span> <span class="n">random_rsa_prime</span><span class="p">(</span><span class="mi">1024</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span> <span class="o">*</span> <span class="n">random_rsa_prime</span><span class="p">(</span><span class="mi">1024</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
+
+<span class="n">c0</span> <span class="o">=</span> <span class="n">rsa_encrypt</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="n">n0</span><span class="p">,</span> <span class="n">message</span><span class="p">)</span>
+<span class="n">c1</span> <span class="o">=</span> <span class="n">rsa_encrypt</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="n">n1</span><span class="p">,</span> <span class="n">message</span><span class="p">)</span>
+<span class="n">c2</span> <span class="o">=</span> <span class="n">rsa_encrypt</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="n">n2</span><span class="p">,</span> <span class="n">message</span><span class="p">)</span>
+
+<span class="n">result</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="p">(</span>
+        <span class="n">c0</span><span class="o">*</span><span class="n">n1</span><span class="o">*</span><span class="n">n2</span><span class="o">*</span><span class="n">modinv</span><span class="p">(</span><span class="n">n1</span><span class="o">*</span><span class="n">n2</span><span class="p">,</span> <span class="n">n0</span><span class="p">)</span> <span class="o">+</span>
+        <span class="n">c1</span><span class="o">*</span><span class="n">n0</span><span class="o">*</span><span class="n">n2</span><span class="o">*</span><span class="n">modinv</span><span class="p">(</span><span class="n">n0</span><span class="o">*</span><span class="n">n2</span><span class="p">,</span> <span class="n">n1</span><span class="p">)</span> <span class="o">+</span>
+        <span class="n">c2</span><span class="o">*</span><span class="n">n0</span><span class="o">*</span><span class="n">n1</span><span class="o">*</span><span class="n">modinv</span><span class="p">(</span><span class="n">n0</span><span class="o">*</span><span class="n">n1</span><span class="p">,</span> <span class="n">n2</span><span class="p">)</span>
+    <span class="p">)</span><span class="o">%</span><span class="p">(</span><span class="n">n0</span><span class="o">*</span><span class="n">n1</span><span class="o">*</span><span class="n">n2</span><span class="p">)</span>
+<span class="p">)</span>
+
+<span class="n">i2b</span><span class="p">(</span><span class="n">integer_cube_root</span><span class="p">(</span><span class="n">result</span><span class="p">))</span>
+</pre></div>
+
+     </div>
+</div>
+</div>
+</div>
+
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+
+
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child jp-OutputArea-executeResult">
+    
+    <div class="jp-OutputPrompt jp-OutputArea-prompt">Out[8]:</div>
+
+
+
+
+<div class="jp-RenderedText jp-OutputArea-output jp-OutputArea-executeResult" data-mime-type="text/plain">
+<pre>b&#39;A second lamp in the belfry burns!&#39;</pre>
+</div>
+
 </div>
 
 </div>
