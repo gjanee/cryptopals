@@ -3,7 +3,7 @@
 <html lang="en">
 <head><meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>index</title><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.1.10/require.min.js"></script>
+<title>set-6</title><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.1.10/require.min.js"></script>
 <style type="text/css">
     pre { line-height: 125%; }
 td.linenos .normal { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
@@ -7511,25 +7511,892 @@ a.anchor-link {
 <!-- End of mermaid configuration --></head>
 <body class="jp-Notebook" data-jp-theme-light="true" data-jp-theme-name="JupyterLab Light">
 <main>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=8e2eb277-3943-4f63-aad9-357fd20998d9">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=81c9896e-bf03-4ba1-966c-2c3810db77ed">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h1 id="Cryptopals-solutions">Cryptopals solutions<a class="anchor-link" href="#Cryptopals-solutions">¶</a></h1><p>Python notebook solutions to <a href="https://cryptopals.com">the cryptopals crypto challenges</a>.  What is cryptopals?  From the website:</p>
-<blockquote>
-<p>This is a different way to learn about crypto than taking a class or reading a book.  We give you problems to solve.  They're derived from weaknesses in real-world systems and modern cryptographic constructions.  We give you enough info to learn about the underlying crypto concepts yourself.  When you're finished, you'll not only have learned a good deal about how cryptosystems are built, but you'll also understand how they're attacked.</p>
-</blockquote>
-<p>Solutions:</p>
+<h1 id="Set-6:-RSA-and-DSA">Set 6: RSA and DSA<a class="anchor-link" href="#Set-6:-RSA-and-DSA">¶</a></h1><p>This is <strong>the last of our original crypto challenges</strong>.</p>
+<p>This set exclusively covers <strong>number-theoretic cryptography</strong>, and, in particular, RSA and DSA.</p>
+<p>This set is <strong>hard</strong>.  The concepts are again new.  The attacks involve some math --- but nothing you didn't learn in 9th grade --- and a significant amount of programming.</p>
+<p>But <strong>they're worth it</strong>.  Two of these attacks in particular are among the most valuable in real-world cryptography.</p>
 <ul>
-<li><a href="set-1.html">Set 1</a></li>
-<li><a href="set-2.html">Set 2</a></li>
-<li><a href="set-3.html">Set 3</a></li>
-<li><a href="set-4.html">Set 4</a></li>
-<li><a href="set-5.html">Set 5</a></li>
-<li><a href="set-6.html">Set 6</a></li>
+<li><a href="#Preliminaries">Preliminaries</a></li>
+<li><a href="#Challenge-41:-Implement-unpadded-message-recovery-oracle">Challenge 41: Implement unpadded message recovery oracle</a></li>
+<li><a href="#Challenge-42:-Bleichenbacher%27s-e=3-RSA-Attack">Challenge 42: Bleichenbacher's e=3 RSA Attack</a></li>
+<li><a href="#Challenge-43:-DSA-key-recovery-from-nonce">Challenge 43: DSA key recovery from nonce</a></li>
+<li><a href="#Challenge-44:-DSA-nonce-recovery-from-repeated-nonce">Challenge 44: DSA nonce recovery from repeated nonce</a></li>
+<li><a href="#Challenge-45:-DSA-parameter-tampering">Challenge 45: DSA parameter tampering</a></li>
+<li><a href="#Challenge-46:-RSA-parity-oracle">Challenge 46: RSA parity oracle</a></li>
 </ul>
+<h2 id="Preliminaries">Preliminaries<a class="anchor-link" href="#Preliminaries">¶</a></h2>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=2307f8c6-fed1-43fc-9414-be42b385ae0a">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [1]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">base64</span><span class="w"> </span><span class="kn">import</span> <span class="n">b64decode</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">collections</span><span class="w"> </span><span class="kn">import</span> <span class="n">namedtuple</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">fractions</span><span class="w"> </span><span class="kn">import</span> <span class="n">Fraction</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">itertools</span><span class="w"> </span><span class="kn">import</span> <span class="n">chain</span><span class="p">,</span> <span class="n">combinations</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">random</span><span class="w"> </span><span class="kn">import</span> <span class="n">randint</span>
+
+<span class="c1"># From pyca/cryptography</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">cryptography.hazmat.primitives.asymmetric</span><span class="w"> </span><span class="kn">import</span> <span class="n">rsa</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">cryptography.hazmat.primitives.asymmetric.padding</span><span class="w"> </span><span class="kn">import</span> <span class="n">PKCS1v15</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">cryptography.hazmat.primitives.hashes</span><span class="w"> </span><span class="kn">import</span> <span class="n">Hash</span><span class="p">,</span> <span class="n">SHA1</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">i2b</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
+    <span class="c1"># Integer to bytes</span>
+    <span class="n">num_bytes</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">n</span><span class="o">.</span><span class="n">to_bytes</span><span class="p">(</span><span class="n">num_bytes</span><span class="p">,</span> <span class="s2">"big"</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">OverflowError</span><span class="p">:</span>
+            <span class="n">num_bytes</span> <span class="o">+=</span> <span class="mi">1</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">b2i</span><span class="p">(</span><span class="n">b</span><span class="p">):</span>
+    <span class="c1"># Bytes to integer</span>
+    <span class="k">return</span> <span class="nb">int</span><span class="o">.</span><span class="n">from_bytes</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="s2">"big"</span><span class="p">)</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">rsa_encrypt_unpadded</span><span class="p">(</span><span class="n">ptext</span><span class="p">,</span> <span class="n">public_key</span><span class="p">):</span>
+    <span class="n">e</span> <span class="o">=</span> <span class="n">public_key</span><span class="o">.</span><span class="n">public_numbers</span><span class="p">()</span><span class="o">.</span><span class="n">e</span>
+    <span class="n">n</span> <span class="o">=</span> <span class="n">public_key</span><span class="o">.</span><span class="n">public_numbers</span><span class="p">()</span><span class="o">.</span><span class="n">n</span>
+    <span class="n">p</span> <span class="o">=</span> <span class="n">b2i</span><span class="p">(</span><span class="n">ptext</span><span class="p">)</span>
+    <span class="k">assert</span> <span class="n">p</span> <span class="o">&lt;</span> <span class="n">n</span>
+    <span class="k">return</span> <span class="n">i2b</span><span class="p">(</span><span class="nb">pow</span><span class="p">(</span><span class="n">p</span><span class="p">,</span> <span class="n">e</span><span class="p">,</span> <span class="n">n</span><span class="p">))</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">rsa_decrypt_unpadded</span><span class="p">(</span><span class="n">ctext</span><span class="p">,</span> <span class="n">private_key</span><span class="p">):</span>
+    <span class="n">d</span> <span class="o">=</span> <span class="n">private_key</span><span class="o">.</span><span class="n">private_numbers</span><span class="p">()</span><span class="o">.</span><span class="n">d</span>
+    <span class="n">n</span> <span class="o">=</span> <span class="n">private_key</span><span class="o">.</span><span class="n">public_key</span><span class="p">()</span><span class="o">.</span><span class="n">public_numbers</span><span class="p">()</span><span class="o">.</span><span class="n">n</span>
+    <span class="k">return</span> <span class="n">i2b</span><span class="p">(</span><span class="nb">pow</span><span class="p">(</span><span class="n">b2i</span><span class="p">(</span><span class="n">ctext</span><span class="p">),</span> <span class="n">d</span><span class="p">,</span> <span class="n">n</span><span class="p">))</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">modinv</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>
+    <span class="c1"># Inverse of a modulo n (extended Euclidean algorithm)</span>
+    <span class="n">t</span><span class="p">,</span> <span class="n">new_t</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span>
+    <span class="n">r</span><span class="p">,</span> <span class="n">new_r</span> <span class="o">=</span> <span class="n">n</span><span class="p">,</span> <span class="n">a</span>
+    <span class="k">while</span> <span class="n">new_r</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">q</span> <span class="o">=</span> <span class="n">r</span><span class="o">//</span><span class="n">new_r</span>
+        <span class="n">t</span><span class="p">,</span> <span class="n">new_t</span> <span class="o">=</span> <span class="n">new_t</span><span class="p">,</span> <span class="n">t</span><span class="o">-</span><span class="n">q</span><span class="o">*</span><span class="n">new_t</span>
+        <span class="n">r</span><span class="p">,</span> <span class="n">new_r</span> <span class="o">=</span> <span class="n">new_r</span><span class="p">,</span> <span class="n">r</span><span class="o">-</span><span class="n">q</span><span class="o">*</span><span class="n">new_r</span>
+    <span class="k">if</span> <span class="n">r</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ZeroDivisionError</span><span class="p">(</span><span class="s2">"no modular inverse"</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">t</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">t</span> <span class="o">+=</span> <span class="n">n</span>
+    <span class="k">return</span> <span class="n">t</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">sha1</span><span class="p">(</span><span class="n">message</span><span class="p">):</span>
+    <span class="n">h</span> <span class="o">=</span> <span class="n">Hash</span><span class="p">(</span><span class="n">SHA1</span><span class="p">())</span>
+    <span class="n">h</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">message</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">h</span><span class="o">.</span><span class="n">finalize</span><span class="p">()</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=b5be6f7c-676b-4157-be18-5460ac2847e7">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<h2 id="Challenge-41:-Implement-unpadded-message-recovery-oracle">Challenge 41: Implement unpadded message recovery oracle<a class="anchor-link" href="#Challenge-41:-Implement-unpadded-message-recovery-oracle">¶</a></h2><p>Nate Lawson says we should stop calling it "RSA padding" and start calling it "RSA armoring".  Here's why.</p>
+<p>Imagine a web application, again with the Javascript encryption, taking RSA-encrypted messages which (again: Javascript) aren't padded before encryption at all.</p>
+<p>You can submit an arbitrary RSA blob and the server will return plaintext.  But you can't submit the same message twice: let's say the server keeps hashes of previous messages for some liveness interval, and that the message has an embedded timestamp:</p>
+<pre><code>{
+  time: 1356304276,
+  social: '555-55-5555'
+}
+</code></pre>
+<p>You'd like to capture other people's messages and use the server to decrypt them.  But when you try, the server takes the hash of the ciphertext and uses it to reject the request.  Any bit you flip in the ciphertext irrevocably scrambles the decryption.</p>
+<p>This turns out to be trivially breakable:</p>
+<ul>
+<li>Capture the ciphertext C</li>
+<li>Let N and E be the public modulus and exponent respectively</li>
+<li>Let S be a random number &gt; 1 mod N.  Doesn't matter what.</li>
+<li>Now:<pre><code>C' = ((S**E mod N) C) mod N
+</code></pre>
+</li>
+<li>Submit C', which appears totally different from C, to the server, recovering P', which appears totally different from P</li>
+<li>Now:<pre><code>      P'
+P = -----  mod N
+      S
+</code></pre>
+</li>
+</ul>
+<p>Oops!</p>
+<p>Implement that attack.</p>
+<blockquote>
+<p><strong>Careful about division in cyclic groups.</strong></p>
+<p>Remember: you don't simply divide mod N; you multiply by the multiplicative inverse mod N.  So you'll need a modinv() function.</p>
+</blockquote>
+<hr/>
+<p>With RSA, given plaintext $P$, we encrypt $C = P^e \bmod N$ and decrypt $P = C^d \bmod N$.  This works because the basic RSA identity is $P^{ed} \equiv P \bmod N$.</p>
+<p>For this exploit, $S$ need not be a random number; it just need be relatively prime to $N$.  The mathematics work out as</p>
+<p>$$
+\begin{eqnarray*}
+C' &amp;=&amp; S^e \, C \bmod N \\
+P' &amp;=&amp; (C')^d = (S^e \, C)^d = S^{ed} \, C^d = S \, C^d = SP \bmod N
+\end{eqnarray*}
+$$</p>
+<p>which is how we arrive at $P = P'/S \bmod N$.</p>
+<p><strong>Background</strong> Write $N = pq$ as a product of primes.  The identity $P^{ed} \equiv P \bmod N$ makes it look like $e$ and $d$ are some kind of inverses modulo $N$.  But $d$ was chosen such that $e$ and $d$ are multiplicative inverses modulo $(p-1)(q-1)$, i.e., $ed \equiv 1 \bmod (p-1)(q-1)$.  What's going on here?  The RSA proof goes as follows.  First, for the case when $P$ is coprime to $N$, because $N = pq$ and $p$ and $q$ are prime, Euler's totient function $\varphi(N) = (p-1)(q-1)$.  Thus we can write $ed \equiv 1 \bmod \varphi(N)$, or equivalently, $ed = 1 + k\varphi(N)$ for some $k$.  By Euler's theorem, because $P$ is coprime to $N$, $P^{\varphi(N)} \equiv 1 \bmod N$.  Then</p>
+<p>$$
+P^{ed} = P^{1+k\varphi(N)} = P \, (P^{\varphi(N)})^k \equiv P \bmod N
+$$</p>
+<p>The case when $P$ is a multiple of $p$ or $q$ (it can't be both, as $P &lt; N$) is handled fairly easily, see <a href="https://www.di-mgt.com.au/rsa_theory.html">RSA Theory</a>.</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=906f52ab-fafe-43d2-9c06-37c368a0b239">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [2]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="n">key</span> <span class="o">=</span> <span class="n">rsa</span><span class="o">.</span><span class="n">generate_private_key</span><span class="p">(</span><span class="mi">3</span><span class="p">,</span> <span class="mi">1024</span><span class="p">)</span>
+<span class="n">plaintext</span> <span class="o">=</span> <span class="sa">b</span><span class="s2">"{time: 1356304276, social: '555-55-5555'}"</span>
+<span class="n">ciphertext</span> <span class="o">=</span> <span class="n">rsa_encrypt_unpadded</span><span class="p">(</span><span class="n">plaintext</span><span class="p">,</span> <span class="n">key</span><span class="o">.</span><span class="n">public_key</span><span class="p">())</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">recover_by_multiplying</span><span class="p">(</span><span class="n">ctext</span><span class="p">,</span> <span class="n">public_key</span><span class="p">,</span> <span class="n">decrypt_fn</span><span class="p">):</span>
+    <span class="n">S</span> <span class="o">=</span> <span class="mi">2</span>  <span class="c1"># arbitrary</span>
+    <span class="n">n</span> <span class="o">=</span> <span class="n">public_key</span><span class="o">.</span><span class="n">public_numbers</span><span class="p">()</span><span class="o">.</span><span class="n">n</span>
+    <span class="n">e</span> <span class="o">=</span> <span class="n">public_key</span><span class="o">.</span><span class="n">public_numbers</span><span class="p">()</span><span class="o">.</span><span class="n">e</span>
+    <span class="n">C_p</span> <span class="o">=</span> <span class="p">(</span><span class="nb">pow</span><span class="p">(</span><span class="n">S</span><span class="p">,</span> <span class="n">e</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span><span class="o">*</span><span class="n">b2i</span><span class="p">(</span><span class="n">ctext</span><span class="p">))</span><span class="o">%</span><span class="k">n</span>
+    <span class="n">P_p</span> <span class="o">=</span> <span class="n">b2i</span><span class="p">(</span><span class="n">decrypt_fn</span><span class="p">(</span><span class="n">i2b</span><span class="p">(</span><span class="n">C_p</span><span class="p">)))</span>
+    <span class="k">return</span> <span class="n">i2b</span><span class="p">((</span><span class="n">P_p</span><span class="o">*</span><span class="n">modinv</span><span class="p">(</span><span class="n">S</span><span class="p">,</span> <span class="n">n</span><span class="p">))</span><span class="o">%</span><span class="k">n</span>)
+
+<span class="n">recover_by_multiplying</span><span class="p">(</span>
+    <span class="n">ciphertext</span><span class="p">,</span>
+    <span class="n">key</span><span class="o">.</span><span class="n">public_key</span><span class="p">(),</span>
+    <span class="k">lambda</span> <span class="n">ctext</span><span class="p">:</span> <span class="n">rsa_decrypt_unpadded</span><span class="p">(</span><span class="n">ctext</span><span class="p">,</span> <span class="n">key</span><span class="p">)</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child jp-OutputArea-executeResult">
+<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[2]:</div>
+<div class="jp-RenderedText jp-OutputArea-output jp-OutputArea-executeResult" data-mime-type="text/plain" tabindex="0">
+<pre>b"{time: 1356304276, social: '555-55-5555'}"</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=10713271-517f-4985-b67b-af5d4457e226">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<p>How would padding help here?  Understand that the purpose and form of RSA padding is entirely different from block cipher padding.  In the latter, <a href="https://datatracker.ietf.org/doc/html/rfc2315#section-10.3">PKCS#7</a> padding is known and predictable (e.g., <code>0x030303</code>) and is needed only for technical reasons.  By contrast, RSA padding is random and serves to obscure the mathematical simplicity of the algorithm.  <a href="https://datatracker.ietf.org/doc/html/rfc2313">PKCS#1 v1.5</a> padding prepends to the plaintext:</p>
+<ul>
+<li>bytes <code>0x00</code> and <code>0x02</code>;</li>
+<li>a number of nonzero random bytes, but at least 8 bytes, such that the total message length is the same as that of the modulus; and</li>
+<li>a terminating <code>0x00</code> byte.</li>
+</ul>
+<p>Multiplying plaintext thusly padded by $S$ will tend to destroy that structure.  (But, given modular arithmetic, isn't it possible that a carefully crafted $S$ could recreate the right delimiting bytes in the right places?)  In any case, we can confirm the protection afforded by padding by repeating the above using regular RSA encryption.  Note that because the padding is random, every execution will differ.</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=da47e410-b1a2-4b80-83ef-36687f9f55cb">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [3]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="n">ciphertext</span> <span class="o">=</span> <span class="n">key</span><span class="o">.</span><span class="n">public_key</span><span class="p">()</span><span class="o">.</span><span class="n">encrypt</span><span class="p">(</span><span class="n">plaintext</span><span class="p">,</span> <span class="n">PKCS1v15</span><span class="p">())</span>
+
+<span class="n">result</span> <span class="o">=</span> <span class="n">recover_by_multiplying</span><span class="p">(</span>
+    <span class="n">ciphertext</span><span class="p">,</span>
+    <span class="n">key</span><span class="o">.</span><span class="n">public_key</span><span class="p">(),</span>
+    <span class="k">lambda</span> <span class="n">ctext</span><span class="p">:</span> <span class="n">key</span><span class="o">.</span><span class="n">decrypt</span><span class="p">(</span><span class="n">ctext</span><span class="p">,</span> <span class="n">PKCS1v15</span><span class="p">())</span>
+<span class="p">)</span>
+
+<span class="n">result</span> <span class="o">==</span> <span class="n">plaintext</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child jp-OutputArea-executeResult">
+<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[3]:</div>
+<div class="jp-RenderedText jp-OutputArea-output jp-OutputArea-executeResult" data-mime-type="text/plain" tabindex="0">
+<pre>False</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=aa86d4d2-8821-410a-aec4-25972dcdfb81">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<h2 id="Challenge-42:-Bleichenbacher's-e=3-RSA-Attack">Challenge 42: Bleichenbacher's e=3 RSA Attack<a class="anchor-link" href="#Challenge-42:-Bleichenbacher's-e=3-RSA-Attack">¶</a></h2><blockquote>
+<p><strong>Crypto-tourism informational placard.</strong></p>
+<p>This attack broke Firefox's TLS certificate validation several years ago.  You could write a Python script to fake an RSA signature for any certificate.  We find new instances of it every other year or so.</p>
+</blockquote>
+<p>RSA with an encrypting exponent of 3 is popular, because it makes the RSA math faster.</p>
+<p>With e=3 RSA, encryption is just cubing a number mod the public encryption modulus:</p>
+<pre><code>c = m ** 3 % n
+</code></pre>
+<p>e=3 is secure as long as we can make assumptions about the message blocks we're encrypting.  The worry with low-exponent RSA is that the message blocks we process won't be large enough to wrap the modulus after being cubed.  The block 00:02 (imagine sufficient zero-padding) can be "encrypted" in e=3 RSA; it is simply 00:08.</p>
+<p>When RSA is used to sign, rather than encrypt, the operations are reversed; the verifier "decrypts" the message by cubing it.  This produces a "plaintext" which the verifier checks for validity.</p>
+<p>When you use RSA to sign a message, you supply it a block input that contains a message digest.  The PKCS1.5 standard formats that block as:</p>
+<pre><code>00h 01h ffh ffh ... ffh ffh 00h ASN.1 GOOP HASH
+</code></pre>
+<p>As intended, the ffh bytes in that block expand to fill the whole block, producing a "right-justified" hash (the last byte of the hash is the last byte of the message).</p>
+<p>There was, 7 years ago, a common implementation flaw with RSA verifiers: they'd verify signatures by "decrypting" them (cubing them modulo the public exponent) and then "parsing" them by looking for 00h 01h ... ffh 00h ASN.1 HASH.</p>
+<p>This is a bug because it implies the verifier isn't checking all the padding.  If you don't check the padding, you leave open the possibility that instead of hundreds of ffh bytes, you have only a few, which if you think about it means there could be squizzilions of possible numbers that could produce a valid-looking signature.</p>
+<p>How to find such a block?  Find a number that when cubed (a) doesn't wrap the modulus (thus bypassing the key entirely) and (b) produces a block that starts "00h 01h ffh ... 00h ASN.1 HASH".</p>
+<p>There are two ways to approach this problem:</p>
+<ul>
+<li>You can work from Hal Finney's writeup, available on Google, of how Bleichenbacher explained the math "so that you can do it by hand with a pencil".</li>
+<li>You can implement an integer cube root in your language, format the message block you want to forge, leaving sufficient trailing zeros at the end to fill with garbage, then take the cube-root of that block.</li>
+</ul>
+<p>Forge a 1024-bit RSA signature for the string "hi mom".  Make sure your implementation actually accepts the signature!</p>
+<hr/>
+<p><a href="https://en.wikipedia.org/wiki/ASN.1">ASN.1</a> is a standard binary syntax for serializing structured data, and technically the hash is part of the ASN.1 packet.  The aforementioned "goop" is the prefix that describes what and how many bytes come next, i.e., the hash.  It would be understandable (though not entirely blameless) if an application that parses ASN.1 neglects to look at anything after a self-describing and self-delimiting ASN.1 packet.</p>
+<p>Hal Finney's writeup is <a href="https://mailarchive.ietf.org/arch/msg/openpgp/5rnE9ZRN1AokBVj3VqblGlP63QE/">here</a>.  We use the second approach, where the key word is "garbage."  We don't need to find a number that, when cubed, matches a given, entire padded signature.  Assuming that an ASN.1-parsing application does not look beyond the ASN.1 packet, the number cubed need match only up to and including the packet; the remaining bytes can be anything that makes the cube root work.  That means, at minimum, if we use only a single <code>0xFF</code> byte and SHA1 for the hash, matching just 39 bytes: the initial <code>0x0001FF00</code>, a 15-byte ASN.1 prefix, and a 20-byte SHA1 hash.  The solution below does just that.  Minimizing what must be matched is critical for this to work.  Our initial approach of using SHA256, which required matching the first 55 bytes, failed unless we used a 2,048-bit modulus.</p>
+<p>Below we use RSA to sign our string, then decrypt the signature and extract the ASN.1 prefix and SHA1 hash.  These are just conveniences; we could in principle construct both ourselves.  The ASN.1 packet decodes (courtesy of <a href="https://lapo.it/asn1js/">this service</a>) as:</p>
+<pre><code>EncryptedPrivateKeyInfo SEQUENCE (2 elem)
+    encryptionAlgorithm AlgorithmIdentifier SEQUENCE (2 elem)
+        algorithm OBJECT IDENTIFIER 1.3.14.3.2.26 sha1 (OIW)
+        parameters ANY NULL
+    encryptedData EncryptedData OCTET STRING (20 byte) hash...
+</code></pre>
+<p>Note that our integer-to-byte conversion function does not preserve the leading <code>0x00</code> byte.</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=e05ba837-7c6c-4a4f-a098-6cf8100de0df">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [4]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">approx_integer_cube_root</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+    <span class="c1"># For positive x, return the closest integer cube root</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">f</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">n</span><span class="o">**</span><span class="mi">3</span>
+    <span class="n">r</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="k">while</span> <span class="n">f</span><span class="p">(</span><span class="n">r</span><span class="p">)</span> <span class="o">&lt;=</span> <span class="n">x</span><span class="p">:</span>
+        <span class="n">r</span> <span class="o">*=</span> <span class="mi">2</span>
+    <span class="n">l</span> <span class="o">=</span> <span class="n">r</span><span class="o">//</span><span class="mi">2</span>
+    <span class="k">while</span> <span class="n">l</span> <span class="o">&lt;=</span> <span class="n">r</span><span class="p">:</span>
+        <span class="n">m</span> <span class="o">=</span> <span class="p">(</span><span class="n">l</span><span class="o">+</span><span class="n">r</span><span class="p">)</span><span class="o">//</span><span class="mi">2</span>
+        <span class="k">if</span> <span class="n">f</span><span class="p">(</span><span class="n">m</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">x</span><span class="p">:</span>
+            <span class="n">l</span> <span class="o">=</span> <span class="n">m</span><span class="o">+</span><span class="mi">1</span>
+        <span class="k">elif</span> <span class="n">f</span><span class="p">(</span><span class="n">m</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">x</span><span class="p">:</span>
+            <span class="n">r</span> <span class="o">=</span> <span class="n">m</span><span class="o">-</span><span class="mi">1</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">m</span>
+    <span class="k">return</span> <span class="n">l</span> <span class="k">if</span> <span class="nb">abs</span><span class="p">(</span><span class="n">f</span><span class="p">(</span><span class="n">l</span><span class="p">)</span><span class="o">-</span><span class="n">x</span><span class="p">)</span> <span class="o">&lt;</span> <span class="nb">abs</span><span class="p">(</span><span class="n">f</span><span class="p">(</span><span class="n">r</span><span class="p">)</span><span class="o">-</span><span class="n">x</span><span class="p">)</span> <span class="k">else</span> <span class="n">r</span>
+
+<span class="n">message</span> <span class="o">=</span> <span class="sa">b</span><span class="s2">"hi mom"</span>
+<span class="n">signature</span> <span class="o">=</span> <span class="n">key</span><span class="o">.</span><span class="n">sign</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="n">PKCS1v15</span><span class="p">(),</span> <span class="n">SHA1</span><span class="p">())</span>
+
+<span class="c1"># Extract ASN.1 packet from signature</span>
+<span class="c1"># N.B.: leading 0x00 byte is missing</span>
+<span class="n">p</span> <span class="o">=</span> <span class="n">rsa_encrypt_unpadded</span><span class="p">(</span><span class="n">signature</span><span class="p">,</span> <span class="n">key</span><span class="o">.</span><span class="n">public_key</span><span class="p">())</span>
+<span class="n">i</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="mh">0x00</span><span class="p">)</span>
+<span class="k">assert</span> <span class="n">p</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="mh">0x01</span> <span class="ow">and</span> <span class="nb">all</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">==</span> <span class="mh">0xFF</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">i</span><span class="p">))</span>
+<span class="n">asn1</span> <span class="o">=</span> <span class="n">p</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">:]</span>
+
+<span class="c1"># Forge a new signature from desired value + 0.5</span>
+<span class="n">p</span> <span class="o">=</span> <span class="nb">bytes</span><span class="p">([</span><span class="mh">0x00</span><span class="p">,</span> <span class="mh">0x01</span><span class="p">,</span> <span class="mh">0xFF</span><span class="p">,</span> <span class="mh">0x00</span><span class="p">])</span> <span class="o">+</span> <span class="n">asn1</span> <span class="o">+</span> <span class="nb">bytes</span><span class="p">([</span><span class="mh">0x80</span><span class="p">])</span>
+<span class="n">p</span> <span class="o">+=</span> <span class="nb">bytes</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">signature</span><span class="p">)</span><span class="o">-</span><span class="nb">len</span><span class="p">(</span><span class="n">p</span><span class="p">))</span>
+<span class="n">forged</span> <span class="o">=</span> <span class="n">i2b</span><span class="p">(</span><span class="n">approx_integer_cube_root</span><span class="p">(</span><span class="n">b2i</span><span class="p">(</span><span class="n">p</span><span class="p">)))</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=758be5aa-a48b-47ea-ae07-b59056c68952">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<p>Unfortunately our OpenSSL-based implementation is too smart to be fooled by our forged signature.  But in lieu of that, we follow the same procedure as before by extracting the ASN.1 packet from the signature, and verify that the forged and original packets match.</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=d2351911-99c5-4ab0-8f34-caf9b495cca5">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [5]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="c1"># As before, but with forged signature</span>
+<span class="n">p</span> <span class="o">=</span> <span class="n">rsa_encrypt_unpadded</span><span class="p">(</span><span class="n">forged</span><span class="p">,</span> <span class="n">key</span><span class="o">.</span><span class="n">public_key</span><span class="p">())</span>
+<span class="n">i</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="mh">0x00</span><span class="p">)</span>
+<span class="k">assert</span> <span class="n">p</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">==</span> <span class="mh">0x01</span> <span class="ow">and</span> <span class="nb">all</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">==</span> <span class="mh">0xFF</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">i</span><span class="p">))</span>
+<span class="n">forged_asn1</span> <span class="o">=</span> <span class="n">p</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">:</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="o">+</span><span class="nb">len</span><span class="p">(</span><span class="n">asn1</span><span class="p">)]</span>
+
+<span class="n">forged_asn1</span> <span class="o">==</span> <span class="n">asn1</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child jp-OutputArea-executeResult">
+<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[5]:</div>
+<div class="jp-RenderedText jp-OutputArea-output jp-OutputArea-executeResult" data-mime-type="text/plain" tabindex="0">
+<pre>True</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=8433ad44-4b36-43ae-9d33-394f9caa53e2">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<h2 id="Challenge-43:-DSA-key-recovery-from-nonce">Challenge 43: DSA key recovery from nonce<a class="anchor-link" href="#Challenge-43:-DSA-key-recovery-from-nonce">¶</a></h2><p><strong>Step 1</strong>: Relocate so that you are out of easy travel distance of us.</p>
+<p><strong>Step 2</strong>: Implement DSA, up to signing and verifying, including parameter generation.</p>
+<p><em>Hah-hah you're too far away to come punch us.</em></p>
+<p><em>Just kidding</em> you can skip the parameter generation part if you want; if you do, use these params:</p>
+<pre><code>p = 800000000000000089e1855218a0e7dac38136ffafa72eda7
+    859f2171e25e65eac698c1702578b07dc2a1076da241c76c6
+    2d374d8389ea5aeffd3226a0530cc565f3bf6b50929139ebe
+    ac04f48c3c84afb796d61e5a4f9a8fda812ab59494232c7d2
+    b4deb50aa18ee9e132bfa85ac4374d7f9091abc3d015efc87
+    1a584471bb1
+
+q = f4f47f05794b256174bba6e9b396a7707e563c5b
+
+g = 5958c9d3898b224b12672c0b98e06c60df923cb8bc999d119
+    458fef538b8fa4046c8db53039db620c094c9fa077ef389b5
+    322a559946a71903f990f1f7e0e025e2d7f7cf494aff1a047
+    0f5b64c36b625a097f1651fe775323556fe00b3608c887892
+    878480e99041be601a62166ca6894bdd41a7054ec89f756ba
+    9fc95302291
+</code></pre>
+<p>("But I want smaller params!"  Then generate them yourself.)</p>
+<p>The DSA signing operation generates a random subkey "k".  You know this because you implemented the DSA sign operation.</p>
+<p>This is the first and easier of two challenges regarding the DSA "k" subkey.</p>
+<p>Given a known "k", it's trivial to recover the DSA private key "x":</p>
+<pre><code>    (s * k) - H(msg)
+x = ----------------  mod q
+            r
+</code></pre>
+<p>Do this a couple times to prove to yourself that you grok it.  Capture it in a function of some sort.</p>
+<p>Now then.  I used the parameters above.  I generated a keypair.  My pubkey is:</p>
+<pre><code>y = 84ad4719d044495496a3201c8ff484feb45b962e7302e56a392aee4
+    abab3e4bdebf2955b4736012f21a08084056b19bcd7fee56048e004
+    e44984e2f411788efdc837a0d2e5abb7b555039fd243ac01f0fb2ed
+    1dec568280ce678e931868d23eb095fde9d3779191b8c0299d6e07b
+    bb283e6633451e535c45513b2d33c99ea17
+</code></pre>
+<p>I signed</p>
+<pre><code>For those that envy a MC it can be hazardous to your health
+So be friendly, a matter of life and death, just like a etch-a-sketch
+</code></pre>
+<p>(My SHA1 for this string was <em>d2d0714f014a9784047eaeccf956520045c45265</em>; I don't know what NIST wants you to do, but when I convert that hash to an integer I get: <em>0xd2d0714f014a9784047eaeccf956520045c45265</em>).</p>
+<p>I get:</p>
+<pre><code>r = 548099063082341131477253921760299949438196259240
+s = 857042759984254168557880549501802188789837994940
+</code></pre>
+<p>I signed this string with a broken implemention of DSA that generated "k" values between 0 and 2^16.  What's my private key?</p>
+<p>Its SHA1 fingerprint (after being converted to hex) is:</p>
+<pre><code>0954edd5e0afe5542a4adf012611a91912a3ec16
+</code></pre>
+<p>Obviously, it also generates the same signature for that string.</p>
+<hr/>
+<p>DSA is defined in <a href="https://doi.org/10.6028/NIST.FIPS.186-4">FIPS 186-4: Digital Signature Standard (DSS)</a>.</p>
+<p>DSA employs randomness, but in a different way from RSA.  As we saw above, RSA encryption adds randomness in the form of random padding bytes which can be structurally identified and removed during decryption.  By contrast, DSA signing uses a per-signing random $k$ value that is directly incorporated into the mathematical computation.  Perhaps this explains why a DSA signature is a pair $(r, s)$: $k$ factors into each component (in different ways), and through a fancy verification computation $k$ is effectively factored back out.  An implication of this approach is that signing the same message with DSA results in a different signature every time.</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=d033ee2d-2b60-443c-8836-23d3ab534f2a">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [6]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="n">DSAParams</span> <span class="o">=</span> <span class="n">namedtuple</span><span class="p">(</span><span class="s2">"DSAParams"</span><span class="p">,</span> <span class="s2">"p q g"</span><span class="p">)</span>
+
+<span class="n">params</span> <span class="o">=</span> <span class="n">DSAParams</span><span class="p">(</span>
+    <span class="n">p</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span>
+        <span class="s2">"800000000000000089e1855218a0e7dac38136ffafa72eda7"</span>
+        <span class="s2">"859f2171e25e65eac698c1702578b07dc2a1076da241c76c6"</span>
+        <span class="s2">"2d374d8389ea5aeffd3226a0530cc565f3bf6b50929139ebe"</span>
+        <span class="s2">"ac04f48c3c84afb796d61e5a4f9a8fda812ab59494232c7d2"</span>
+        <span class="s2">"b4deb50aa18ee9e132bfa85ac4374d7f9091abc3d015efc87"</span>
+        <span class="s2">"1a584471bb1"</span><span class="p">,</span>
+        <span class="mi">16</span>
+    <span class="p">),</span>
+    <span class="n">q</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span><span class="s2">"f4f47f05794b256174bba6e9b396a7707e563c5b"</span><span class="p">,</span> <span class="mi">16</span><span class="p">),</span>
+    <span class="n">g</span><span class="o">=</span><span class="nb">int</span><span class="p">(</span>
+        <span class="s2">"5958c9d3898b224b12672c0b98e06c60df923cb8bc999d119"</span>
+        <span class="s2">"458fef538b8fa4046c8db53039db620c094c9fa077ef389b5"</span>
+        <span class="s2">"322a559946a71903f990f1f7e0e025e2d7f7cf494aff1a047"</span>
+        <span class="s2">"0f5b64c36b625a097f1651fe775323556fe00b3608c887892"</span>
+        <span class="s2">"878480e99041be601a62166ca6894bdd41a7054ec89f756ba"</span>
+        <span class="s2">"9fc95302291"</span><span class="p">,</span>
+        <span class="mi">16</span>
+    <span class="p">)</span>
+<span class="p">)</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">dsa_generate_keys</span><span class="p">(</span><span class="n">params</span><span class="p">):</span>
+    <span class="c1"># Return private key, public key</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">randint</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">params</span><span class="o">.</span><span class="n">q</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">y</span> <span class="o">=</span> <span class="nb">pow</span><span class="p">(</span><span class="n">params</span><span class="o">.</span><span class="n">g</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">params</span><span class="o">.</span><span class="n">p</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">dsa_sign</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="n">x</span><span class="p">):</span>
+    <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+        <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+            <span class="n">k</span> <span class="o">=</span> <span class="n">randint</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">params</span><span class="o">.</span><span class="n">q</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+            <span class="n">r</span> <span class="o">=</span> <span class="nb">pow</span><span class="p">(</span><span class="n">params</span><span class="o">.</span><span class="n">g</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">params</span><span class="o">.</span><span class="n">p</span><span class="p">)</span> <span class="o">%</span> <span class="n">params</span><span class="o">.</span><span class="n">q</span>
+            <span class="k">if</span> <span class="n">r</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">break</span>
+        <span class="n">h</span> <span class="o">=</span> <span class="n">b2i</span><span class="p">(</span><span class="n">sha1</span><span class="p">(</span><span class="n">message</span><span class="p">))</span>
+        <span class="n">s</span> <span class="o">=</span> <span class="p">(</span><span class="n">modinv</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">params</span><span class="o">.</span><span class="n">q</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">h</span> <span class="o">+</span> <span class="n">x</span><span class="o">*</span><span class="n">r</span><span class="p">))</span> <span class="o">%</span> <span class="n">params</span><span class="o">.</span><span class="n">q</span>
+        <span class="k">if</span> <span class="n">s</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="k">break</span>
+    <span class="k">return</span> <span class="n">r</span><span class="p">,</span> <span class="n">s</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">dsa_verify</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="n">r</span><span class="p">,</span> <span class="n">s</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="n">y</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">r</span> <span class="o">&lt;=</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">r</span> <span class="o">&gt;=</span> <span class="n">params</span><span class="o">.</span><span class="n">q</span> <span class="ow">or</span> <span class="n">s</span> <span class="o">&lt;=</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">s</span> <span class="o">&gt;=</span> <span class="n">params</span><span class="o">.</span><span class="n">q</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="n">w</span> <span class="o">=</span> <span class="n">modinv</span><span class="p">(</span><span class="n">s</span><span class="p">,</span> <span class="n">params</span><span class="o">.</span><span class="n">q</span><span class="p">)</span>
+    <span class="n">h</span> <span class="o">=</span> <span class="n">b2i</span><span class="p">(</span><span class="n">sha1</span><span class="p">(</span><span class="n">message</span><span class="p">))</span>
+    <span class="n">u1</span> <span class="o">=</span> <span class="p">(</span><span class="n">h</span><span class="o">*</span><span class="n">w</span><span class="p">)</span> <span class="o">%</span> <span class="n">params</span><span class="o">.</span><span class="n">q</span>
+    <span class="n">u2</span> <span class="o">=</span> <span class="p">(</span><span class="n">r</span><span class="o">*</span><span class="n">w</span><span class="p">)</span> <span class="o">%</span> <span class="n">params</span><span class="o">.</span><span class="n">q</span>
+    <span class="n">v</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="p">(</span><span class="nb">pow</span><span class="p">(</span><span class="n">params</span><span class="o">.</span><span class="n">g</span><span class="p">,</span> <span class="n">u1</span><span class="p">,</span> <span class="n">params</span><span class="o">.</span><span class="n">p</span><span class="p">)</span> <span class="o">*</span> <span class="nb">pow</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">u2</span><span class="p">,</span> <span class="n">params</span><span class="o">.</span><span class="n">p</span><span class="p">))</span>
+        <span class="o">%</span> <span class="n">params</span><span class="o">.</span><span class="n">p</span> <span class="o">%</span> <span class="n">params</span><span class="o">.</span><span class="n">q</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">v</span> <span class="o">==</span> <span class="n">r</span>
+
+<span class="n">message</span> <span class="o">=</span> <span class="sa">b</span><span class="s2">"""For those that envy a MC it can be hazardous to your health</span>
+<span class="s2">So be friendly, a matter of life and death, just like a etch-a-sketch</span>
+<span class="s2">"""</span>
+
+<span class="c1"># Try it out</span>
+<span class="n">x</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">dsa_generate_keys</span><span class="p">(</span><span class="n">params</span><span class="p">)</span>
+<span class="n">r</span><span class="p">,</span> <span class="n">s</span> <span class="o">=</span> <span class="n">dsa_sign</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="n">x</span><span class="p">)</span>
+<span class="n">dsa_verify</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="n">r</span><span class="p">,</span> <span class="n">s</span><span class="p">,</span> <span class="n">params</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child jp-OutputArea-executeResult">
+<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[6]:</div>
+<div class="jp-RenderedText jp-OutputArea-output jp-OutputArea-executeResult" data-mime-type="text/plain" tabindex="0">
+<pre>True</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=7e55d65b-5965-4cff-95a1-f13024277180">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<p>Notice that in a DSA signature, $r = g^k \bmod p \bmod q$ is a function of $k$ only (other than the public, application-wide parameters), and thus if a repeated $r$ value is ever observed it's a good indication that $k$ values are being reused.  If there is a small pool of possible $k$ values as in this challenge, this becomes a simple dictionary attack.  We identify the private key by seeing which candidate key produces the given public key.</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=c4cc7812-12cb-4ba4-94d2-8feb3dfe07b4">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [7]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">recover_x</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="n">r</span><span class="p">,</span> <span class="n">s</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">params</span><span class="p">):</span>
+    <span class="k">return</span> <span class="p">(</span><span class="n">modinv</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">params</span><span class="o">.</span><span class="n">q</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">s</span><span class="o">*</span><span class="n">k</span> <span class="o">-</span> <span class="n">b2i</span><span class="p">(</span><span class="n">sha1</span><span class="p">(</span><span class="n">message</span><span class="p">))))</span> <span class="o">%</span> <span class="n">params</span><span class="o">.</span><span class="n">q</span>
+
+<span class="n">given_y</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span>
+    <span class="s2">"84ad4719d044495496a3201c8ff484feb45b962e7302e56a392aee4"</span>
+    <span class="s2">"abab3e4bdebf2955b4736012f21a08084056b19bcd7fee56048e004"</span>
+    <span class="s2">"e44984e2f411788efdc837a0d2e5abb7b555039fd243ac01f0fb2ed"</span>
+    <span class="s2">"1dec568280ce678e931868d23eb095fde9d3779191b8c0299d6e07b"</span>
+    <span class="s2">"bb283e6633451e535c45513b2d33c99ea17"</span><span class="p">,</span>
+    <span class="mi">16</span>
+<span class="p">)</span>
+<span class="n">given_r</span> <span class="o">=</span> <span class="mi">548099063082341131477253921760299949438196259240</span>
+<span class="n">given_s</span> <span class="o">=</span> <span class="mi">857042759984254168557880549501802188789837994940</span>
+
+<span class="c1"># Rotate range just to make this notebook faster</span>
+<span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">chain</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="o">**</span><span class="mi">14</span><span class="p">,</span> <span class="mi">2</span><span class="o">**</span><span class="mi">16</span><span class="p">),</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="o">**</span><span class="mi">14</span><span class="p">)):</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">recover_x</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="n">given_r</span><span class="p">,</span> <span class="n">given_s</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span>
+    <span class="n">y</span> <span class="o">=</span> <span class="nb">pow</span><span class="p">(</span><span class="n">params</span><span class="o">.</span><span class="n">g</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">params</span><span class="o">.</span><span class="n">p</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">y</span> <span class="o">==</span> <span class="n">given_y</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="s2">"Key found, SHA1 fingerprint is"</span><span class="p">,</span>
+            <span class="n">sha1</span><span class="p">(</span><span class="n">i2b</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">hex</span><span class="p">()</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">"ASCII"</span><span class="p">))</span><span class="o">.</span><span class="n">hex</span><span class="p">()</span>
+        <span class="p">)</span>
+        <span class="k">break</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>Key found, SHA1 fingerprint is 0954edd5e0afe5542a4adf012611a91912a3ec16
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=7962d09b-62f5-414c-b7fc-709f5ab4d3c6">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<h2 id="Challenge-44:-DSA-nonce-recovery-from-repeated-nonce">Challenge 44: DSA nonce recovery from repeated nonce<a class="anchor-link" href="#Challenge-44:-DSA-nonce-recovery-from-repeated-nonce">¶</a></h2><blockquote>
+<p><strong>Cryptanalytic MVP award.</strong></p>
+<p>This attack (in an elliptic curve group) broke the PS3.  It is a great, great attack.</p>
+</blockquote>
+<p><a href="https://cryptopals.com/static/challenge-data/44.txt">In this file find a collection of DSA-signed messages.</a>  (NB: each msg has a trailing space.)</p>
+<p>These were signed under the following pubkey:</p>
+<pre><code>y = 2d026f4bf30195ede3a088da85e398ef869611d0f68f07
+    13d51c9c1a3a26c95105d915e2d8cdf26d056b86b8a7b8
+    5519b1c23cc3ecdc6062650462e3063bd179c2a6581519
+    f674a61f1d89a1fff27171ebc1b93d4dc57bceb7ae2430
+    f98a6a4d83d8279ee65d71c1203d2c96d65ebbf7cce9d3
+    2971c3de5084cce04a2e147821
+</code></pre>
+<p>(using the same domain parameters as the previous exercise)</p>
+<p>It should not be hard to find the messages for which we have accidentally used a repeated "k".  Given a pair of such messages, you can discover the "k" we used with the following formula:</p>
+<pre><code>    (m1 - m2)
+k = --------- mod q
+    (s1 - s2)
+</code></pre>
+<blockquote>
+<p><strong>9th Grade Math: Study It!</strong></p>
+<p>If you want to demystify this, work out that equation from the original DSA equations.</p>
+</blockquote>
+<blockquote>
+<p><strong>Basic cyclic group math operations want to screw you</strong></p>
+<p>Remember all this math is mod q; s2 may be larger than s1, for instance, which isn't a problem if you're doing the subtraction mod q.  If you're like me, you'll definitely lose an hour to forgetting a paren or a mod q.  (And don't forget that modular inverse function!)</p>
+</blockquote>
+<p>What's my private key?  Its SHA1 (from hex) is:</p>
+<pre><code>ca8f6f7c66fa362d40760d135b763eb8527d3d52
+</code></pre>
+<hr/>
+<p>Both this challenge and the previous challenge exploit the computation of $s$:</p>
+<p>$$
+s = \frac{H + xr}{k} \bmod q
+$$</p>
+<p>The previous challenge rewrote this equation to solve for $x$ given known $k$.  Here, on the assumption that $k$ is repeated (and therefore $r$ is also repeated), we have</p>
+<p>$$
+\begin{eqnarray*}
+s_1 &amp;=&amp; (H_1 + xr)/k \bmod q \\
+s_2 &amp;=&amp; (H_2 + xr)/k \bmod q
+\end{eqnarray*}
+$$</p>
+<p>and from there</p>
+<p>$$
+k = \frac{H_1 - H_2}{s_1 - s_2} \bmod q
+$$</p>
+<p>This quantity can be computed regardless whether $k$ was reused or not (as long as $s_1 \ne s_2$), so calling it $k$ is a slight misnomer as it may or may not actually be $k$.  But if $k$ was reused, then it can be computed thusly, and from there, $x$ as before.</p>
+<p>There's something odd with this challenge that we weren't able to figure out.  The input file contains 11 signed messages, of which 3 pairs have the same $r$ value.  Yet of those, only one pair reflects a reuse of $k$.  How can that be?  Recall that $r = g^k \bmod p \bmod q$.  The uncomfortable conclusion we come to is that the other two pairs use different $k$ values, and get different values for $g^k \bmod p$, that are nevertheless equivalent modulo $q$.</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=4a6767e9-a3d7-4b43-b7a9-c0e2f0608502">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [8]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="n">given_y</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span>
+    <span class="s2">"2d026f4bf30195ede3a088da85e398ef869611d0f68f07"</span>
+    <span class="s2">"13d51c9c1a3a26c95105d915e2d8cdf26d056b86b8a7b8"</span>
+    <span class="s2">"5519b1c23cc3ecdc6062650462e3063bd179c2a6581519"</span>
+    <span class="s2">"f674a61f1d89a1fff27171ebc1b93d4dc57bceb7ae2430"</span>
+    <span class="s2">"f98a6a4d83d8279ee65d71c1203d2c96d65ebbf7cce9d3"</span>
+    <span class="s2">"2971c3de5084cce04a2e147821"</span><span class="p">,</span>
+    <span class="mi">16</span>
+<span class="p">)</span>
+
+<span class="n">DSASignedMessage</span> <span class="o">=</span> <span class="n">namedtuple</span><span class="p">(</span><span class="s2">"DSASignedMessage"</span><span class="p">,</span> <span class="s2">"message r s hash"</span><span class="p">)</span>
+
+<span class="n">lines</span> <span class="o">=</span> <span class="p">[</span><span class="n">l</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">l</span> <span class="ow">in</span> <span class="nb">open</span><span class="p">(</span><span class="s2">"44.in"</span><span class="p">)</span><span class="o">.</span><span class="n">readlines</span><span class="p">()]</span>
+<span class="n">messages</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="n">DSASignedMessage</span><span class="p">(</span>
+        <span class="n">msg</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">": "</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">"ASCII"</span><span class="p">),</span>
+        <span class="nb">int</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">": "</span><span class="p">)[</span><span class="mi">1</span><span class="p">]),</span>
+        <span class="nb">int</span><span class="p">(</span><span class="n">s</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">": "</span><span class="p">)[</span><span class="mi">1</span><span class="p">]),</span>
+        <span class="nb">int</span><span class="p">(</span><span class="n">m</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">": "</span><span class="p">)[</span><span class="mi">1</span><span class="p">],</span> <span class="mi">16</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="k">for</span> <span class="n">msg</span><span class="p">,</span> <span class="n">s</span><span class="p">,</span> <span class="n">r</span><span class="p">,</span> <span class="n">m</span> <span class="ow">in</span> <span class="p">[</span><span class="n">lines</span><span class="p">[</span><span class="n">i</span><span class="p">:</span><span class="n">i</span><span class="o">+</span><span class="mi">4</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">lines</span><span class="p">),</span> <span class="mi">4</span><span class="p">)]</span>
+<span class="p">]</span>
+
+<span class="k">for</span> <span class="n">m1</span><span class="p">,</span> <span class="n">m2</span> <span class="ow">in</span> <span class="n">combinations</span><span class="p">(</span><span class="n">messages</span><span class="p">,</span> <span class="mi">2</span><span class="p">):</span>
+    <span class="n">k</span> <span class="o">=</span> <span class="p">(</span><span class="n">modinv</span><span class="p">(</span><span class="n">m1</span><span class="o">.</span><span class="n">s</span><span class="o">-</span><span class="n">m2</span><span class="o">.</span><span class="n">s</span><span class="p">,</span> <span class="n">params</span><span class="o">.</span><span class="n">q</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">m1</span><span class="o">.</span><span class="n">hash</span><span class="o">-</span><span class="n">m2</span><span class="o">.</span><span class="n">hash</span><span class="p">))</span> <span class="o">%</span> <span class="n">params</span><span class="o">.</span><span class="n">q</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">recover_x</span><span class="p">(</span><span class="n">m1</span><span class="o">.</span><span class="n">message</span><span class="p">,</span> <span class="n">m1</span><span class="o">.</span><span class="n">r</span><span class="p">,</span> <span class="n">m1</span><span class="o">.</span><span class="n">s</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">params</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">pow</span><span class="p">(</span><span class="n">params</span><span class="o">.</span><span class="n">g</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">params</span><span class="o">.</span><span class="n">p</span><span class="p">)</span> <span class="o">==</span> <span class="n">given_y</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span>
+            <span class="s2">"Key found, SHA1 fingerprint is"</span><span class="p">,</span>
+            <span class="n">sha1</span><span class="p">(</span><span class="n">i2b</span><span class="p">(</span><span class="n">x</span><span class="p">)</span><span class="o">.</span><span class="n">hex</span><span class="p">()</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">"ASCII"</span><span class="p">))</span><span class="o">.</span><span class="n">hex</span><span class="p">()</span>
+        <span class="p">)</span>
+        <span class="k">break</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>Key found, SHA1 fingerprint is ca8f6f7c66fa362d40760d135b763eb8527d3d52
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=654be98a-490c-4e66-93db-44859726cad0">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<h2 id="Challenge-45:-DSA-parameter-tampering">Challenge 45: DSA parameter tampering<a class="anchor-link" href="#Challenge-45:-DSA-parameter-tampering">¶</a></h2><p>Take your DSA code from the previous exercise.  Imagine it as part of an algorithm in which the client was allowed to propose domain parameters (the p and q moduli, and the g generator).</p>
+<p>This would be bad, because attackers could trick victims into accepting bad parameters.  Vaudenay gave two examples of bad generator parameters: generators that were 0 mod p, and generators that were 1 mod p.</p>
+<p>Use the parameters from the previous exercise, but substitute 0 for "g".  Generate a signature.  You will notice something bad.  Verify the signature.  Now verify any other signature, for any other string.</p>
+<p>Now, try (p+1) as "g".  With this "g", you can generate a magic signature s, r for any DSA public key that will validate against any string.  For arbitrary z:</p>
+<pre><code>r = ((y**z) % p) % q
+
+      r
+s =  --- % q
+      z
+</code></pre>
+<p>Sign "Hello, world".  And "Goodbye, world".</p>
+<hr/>
+<p>If $g = 0$ then the signing operation, per the DSA algorithm, goes into an infinite loop.  But if it were somehow possible that $g = 0$, then public key $y = 0$ and every signature would have $r = 0$, and then every signature verification would succeed because $v = r = 0$.  For the second problem, we're not sure what the above equations are about.  If $g = p+1$, then $y = 1$ and every signature would have $r = 1$, and then every signature verification would succeed because $v = r = 1$.</p>
+<p>(In DSA, not only must $g &gt; 1$, but $g$ must be "a generator of the order $q$ in the multiplicative group of $\textrm{GF}(p)$.")</p>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=188bbfc5-4463-4348-bf12-61f2942e5f9d">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<h2 id="Challenge-46:-RSA-parity-oracle">Challenge 46: RSA parity oracle<a class="anchor-link" href="#Challenge-46:-RSA-parity-oracle">¶</a></h2><blockquote>
+<p><strong>When does this ever happen?</strong></p>
+<p>This is a bit of a toy problem, but it's very helpful for understanding what RSA is doing (and also for why pure number-theoretic encryption is terrifying).  Trust us, you want to do this before trying the next challenge.  Also, it's fun.</p>
+</blockquote>
+<p>Generate a 1024 bit RSA key pair.</p>
+<p>Write an oracle function that uses the private key to answer the question "is the plaintext of this message even or odd" (is the last bit of the message 0 or 1).  Imagine for instance a server that accepted RSA-encrypted messages and checked the parity of their decryption to validate them, and spat out an error if they were of the wrong parity.</p>
+<p>Anyways: function returning true or false based on whether the decrypted plaintext was even or odd, and nothing else.</p>
+<p>Take the following string and un-Base64 it in your code (without looking at it!) and encrypt it to the public key, creating a ciphertext:</p>
+<pre><code>VGhhdCdzIHdoeSBJIGZvdW5kIHlvdSBkb24ndCBwbGF5IGFyb3VuZCB3aXRoIHRoZSBGdW5reSBDb2xkIE1lZGluYQ==
+</code></pre>
+<p>With your oracle function, you can trivially decrypt the message.</p>
+<p>Here's why:</p>
+<ul>
+<li>RSA ciphertexts are just numbers.  You can do trivial math on them.  You can for instance multiply a ciphertext by the RSA-encryption of another number; the corresponding plaintext will be the product of those two numbers.</li>
+<li>If you double a ciphertext (multiply it by (2**e)%n), the resulting plaintext will (obviously) be either even or odd.</li>
+<li>If the plaintext after doubling is even, doubling the plaintext <em>didn't wrap the modulus</em> --- the modulus is a prime number.  That means the plaintext is less than half the modulus.</li>
+</ul>
+<p>You can repeatedly apply this heuristic, once per bit of the message, checking your oracle function each time.</p>
+<p>Your decryption function starts with bounds for the plaintext of [0,n].</p>
+<p>Each iteration of the decryption cuts the bounds in half; either the upper bound is reduced by half, or the lower bound is.</p>
+<p>After log2(n) iterations, you have the decryption of the message.</p>
+<p>Print the upper bound of the message as a string at each iteration; you'll see the message decrypt "hollywood style".</p>
+<p>Decrypt the string (after encrypting it to a hidden private key) above.</p>
+<hr/>
+<p>In more detail, if plaintext $P = C^d \bmod n$, then</p>
+<p>$$(2^e \, C)^d \bmod n = 2^{ed} \, C^d \bmod n = 2P \bmod n$$</p>
+<p>Now, if $0 &lt; P &lt; n/2$, then $0 &lt; 2P &lt; n$ and $2P \bmod n = 2P$ is even.  Otherwise, if $n/2 &lt; P &lt; n$, then $n &lt; 2P &lt; 2n$ and $2P \bmod n = 2P-n$ is odd because $n$ is odd.  In this way the parity of $2P \bmod n$ indicates in which half of $[0,n]$ $P$ resides.  Next consider $4P$:</p>
+<ul>
+<li>If $0 &lt; P &lt; n/4$, then $0 &lt; 4P &lt; n$ and $4P \bmod n = 4P$ is even.</li>
+<li>If $n/4 &lt; P &lt; n/2$, then $n &lt; 4P &lt; 2n$ and $4P \bmod n = 4P-n$ is odd.</li>
+<li>If $n/2 &lt; P &lt; 3n/4$, then $2n &lt; 4P &lt; 3n$ and $4P \bmod n = 4P-2n$ is again even.</li>
+<li>And if $3n/4 &lt; P &lt; n$, then $3n &lt; 4P &lt; 4n$ and $4P \bmod n = 4P-3n$ is again odd.</li>
+</ul>
+<p>Combining the $2P$ and $4P$ tests, we can determine in which fractional quarter of $[0,n]$ $P$ resides, and so on iteratively.</p>
+<p>The loop below executes 1,024 times corresponding to the modulus bit length.  We attempted to perform the search using integer bounds, but found that after 1,018 iterations the bounds drifted away from the solution, perhaps because enough roundoff error had accumulated to cause the bounds to deviate from the neat fractional power-of-2 subdivisions of $[0,n]$.  Using fractions instead of integers solves the problem.  Because $n$ is coprime to $2$, the bounds will always be pure fractions.  The loop terminates when the bounds differ by less than a unit, i.e., the bounds straddle the integer solution which is retrievable by taking the floor of the upper or right bound.</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=3b9c427a-e25c-4cd3-8fbe-7834f5edcac8">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [9]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">IPython.display</span><span class="w"> </span><span class="kn">import</span> <span class="n">HTML</span>
+
+<span class="n">plaintext</span> <span class="o">=</span> <span class="n">b64decode</span><span class="p">(</span>
+    <span class="s2">"VGhhdCdzIHdoeSBJIGZvdW5kIHlvdSBkb24ndCBwbGF5IGFyb3"</span>
+    <span class="s2">"VuZCB3aXRoIHRoZSBGdW5reSBDb2xkIE1lZGluYQ=="</span>
+<span class="p">)</span>
+<span class="n">ciphertext</span> <span class="o">=</span> <span class="n">rsa_encrypt_unpadded</span><span class="p">(</span><span class="n">plaintext</span><span class="p">,</span> <span class="n">key</span><span class="o">.</span><span class="n">public_key</span><span class="p">())</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">display_line</span><span class="p">(</span><span class="n">line</span><span class="p">):</span>
+    <span class="n">rp</span> <span class="o">=</span> <span class="nb">repr</span><span class="p">(</span><span class="n">plaintext</span><span class="p">)</span>
+    <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">while</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">rp</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">rp</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">!=</span> <span class="n">line</span><span class="p">[</span><span class="n">i</span><span class="p">]:</span>
+            <span class="k">break</span>
+        <span class="n">i</span> <span class="o">+=</span> <span class="mi">1</span>
+    <span class="k">return</span> <span class="n">line</span><span class="p">[:</span><span class="n">i</span><span class="p">]</span> <span class="o">+</span> <span class="s2">"&lt;span style='color: red'&gt;"</span> <span class="o">+</span> <span class="n">line</span><span class="p">[</span><span class="n">i</span><span class="p">:]</span> <span class="o">+</span> <span class="s2">"&lt;/span&gt;"</span>
+
+<span class="n">n</span> <span class="o">=</span> <span class="n">key</span><span class="o">.</span><span class="n">public_key</span><span class="p">()</span><span class="o">.</span><span class="n">public_numbers</span><span class="p">()</span><span class="o">.</span><span class="n">n</span>
+<span class="n">e</span> <span class="o">=</span> <span class="n">key</span><span class="o">.</span><span class="n">public_key</span><span class="p">()</span><span class="o">.</span><span class="n">public_numbers</span><span class="p">()</span><span class="o">.</span><span class="n">e</span>
+<span class="n">l</span><span class="p">,</span> <span class="n">r</span> <span class="o">=</span> <span class="n">Fraction</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span> <span class="n">Fraction</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
+<span class="n">c</span> <span class="o">=</span> <span class="n">b2i</span><span class="p">(</span><span class="n">ciphertext</span><span class="p">)</span>
+<span class="n">i</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="n">output</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="k">while</span> <span class="n">r</span><span class="o">-</span><span class="n">l</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+    <span class="n">m</span> <span class="o">=</span> <span class="p">(</span><span class="n">l</span><span class="o">+</span><span class="n">r</span><span class="p">)</span><span class="o">/</span><span class="mi">2</span>
+    <span class="n">c2e</span> <span class="o">=</span> <span class="p">(</span><span class="n">c</span><span class="o">*</span><span class="p">(</span><span class="mi">2</span><span class="o">**</span><span class="n">e</span><span class="p">))</span> <span class="o">%</span> <span class="n">n</span>
+    <span class="k">if</span> <span class="n">b2i</span><span class="p">(</span><span class="n">rsa_decrypt_unpadded</span><span class="p">(</span><span class="n">i2b</span><span class="p">(</span><span class="n">c2e</span><span class="p">),</span> <span class="n">key</span><span class="p">))</span> <span class="o">%</span> <span class="mi">2</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="n">m</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">l</span> <span class="o">=</span> <span class="n">m</span>
+    <span class="n">c</span> <span class="o">=</span> <span class="n">c2e</span>
+    <span class="k">if</span> <span class="n">i</span> <span class="o">&gt;=</span> <span class="mi">1000</span><span class="p">:</span>
+        <span class="n">output</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">display_line</span><span class="p">(</span><span class="nb">repr</span><span class="p">(</span><span class="n">i2b</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">r</span><span class="p">)))))</span>
+    <span class="n">i</span> <span class="o">+=</span> <span class="mi">1</span>
+
+<span class="n">display</span><span class="p">(</span><span class="n">HTML</span><span class="p">(</span><span class="s2">"&lt;code&gt;"</span> <span class="o">+</span> <span class="s2">"</span><span class="se">\n</span><span class="s2">"</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output</span><span class="p">)</span> <span class="o">+</span> <span class="s2">"&lt;/code&gt;"</span><span class="p">))</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedHTMLCommon jp-RenderedHTML jp-OutputArea-output" data-mime-type="text/html" tabindex="0">
+<code>b"That's why I found you don't play around with the Funky Cold Med<span style="color: red">\xa6\xdd\xf9"</span>
+b"That's why I found you don't play around with the Funky Cold Med<span style="color: red">r\r\xcc"</span>
+b"That's why I found you don't play around with the Funky Cold Med<span style="color: red">r\r\xcc"</span>
+b"That's why I found you don't play around with the Funky Cold Med<span style="color: red">r\r\xcc"</span>
+b"That's why I found you don't play around with the Funky Cold Med<span style="color: red">ks\xc6"</span>
+b"That's why I found you don't play around with the Funky Cold Med<span style="color: red">ks\xc6"</span>
+b"That's why I found you don't play around with the Funky Cold Medi<span style="color: red">\xcdE"</span>
+b"That's why I found you don't play around with the Funky Cold Medi<span style="color: red">\xcdE"</span>
+b"That's why I found you don't play around with the Funky Cold Medi<span style="color: red">\xcdE"</span>
+b"That's why I found you don't play around with the Funky Cold Medi<span style="color: red">\x98u"</span>
+b"That's why I found you don't play around with the Funky Cold Medi<span style="color: red">~\r"</span>
+b"That's why I found you don't play around with the Funky Cold Medi<span style="color: red">p\xd9"</span>
+b"That's why I found you don't play around with the Funky Cold Medi<span style="color: red">p\xd9"</span>
+b"That's why I found you don't play around with the Funky Cold Medi<span style="color: red">p\xd9"</span>
+b"That's why I found you don't play around with the Funky Cold Medi<span style="color: red">o2"</span>
+b"That's why I found you don't play around with the Funky Cold Medi<span style="color: red">o2"</span>
+b"That's why I found you don't play around with the Funky Cold Medin<span style="color: red">\xc8"</span>
+b"That's why I found you don't play around with the Funky Cold Medin<span style="color: red">\x94"</span>
+b"That's why I found you don't play around with the Funky Cold Medin<span style="color: red">y"</span>
+b"That's why I found you don't play around with the Funky Cold Medin<span style="color: red">l"</span>
+b"That's why I found you don't play around with the Funky Cold Medin<span style="color: red">e"</span>
+b"That's why I found you don't play around with the Funky Cold Medin<span style="color: red">b"</span>
+b"That's why I found you don't play around with the Funky Cold Medin<span style="color: red">b"</span>
+b"That's why I found you don't play around with the Funky Cold Medina"<span style="color: red"></span></code>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=f7b31f9e-ee3c-4d54-9efe-bc08941e771d">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<p>And for confirmation:</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=a7a50a06-2a27-4921-8de6-f055ce5489db">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [10]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="n">i2b</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">r</span><span class="p">))</span> <span class="o">==</span> <span class="n">plaintext</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child jp-OutputArea-executeResult">
+<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[10]:</div>
+<div class="jp-RenderedText jp-OutputArea-output jp-OutputArea-executeResult" data-mime-type="text/plain" tabindex="0">
+<pre>True</pre>
+</div>
 </div>
 </div>
 </div>
