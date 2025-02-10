@@ -1,1 +1,1 @@
-Solutions to [the cryptopals crypto challenges](https://cryptopals.com).
+Solutions to [the cryptopals crypto challenges](https://cryptopals.com) in Python.  The main dependency is on `cryptography` ([pyca/cryptography](https://cryptography.io/en/latest/)).  Additional dependencies include `pandas`, `matplotlib`, and `requests`.
