@@ -3,7 +3,7 @@
 <html lang="en">
 <head><meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>index</title><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.1.10/require.min.js"></script>
+<title>set-7</title><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.1.10/require.min.js"></script>
 <style type="text/css">
     pre { line-height: 125%; }
 td.linenos .normal { color: inherit; background-color: transparent; padding-left: 5px; padding-right: 5px; }
@@ -7511,26 +7511,534 @@ a.anchor-link {
 <!-- End of mermaid configuration --></head>
 <body class="jp-Notebook" data-jp-theme-light="true" data-jp-theme-name="JupyterLab Light">
 <main>
-<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=8e2eb277-3943-4f63-aad9-357fd20998d9">
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=bc17a286-50aa-4eda-9fb0-0574f8881d3d">
 <div class="jp-Cell-inputWrapper" tabindex="0">
 <div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
 </div>
 <div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
 </div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
-<h1 id="Cryptopals-solutions">Cryptopals solutions<a class="anchor-link" href="#Cryptopals-solutions">¶</a></h1><p>Python notebook solutions to <a href="https://cryptopals.com">the cryptopals crypto challenges</a>.  What is cryptopals?  From the website:</p>
-<blockquote>
-<p>This is a different way to learn about crypto than taking a class or reading a book.  We give you problems to solve.  They're derived from weaknesses in real-world systems and modern cryptographic constructions.  We give you enough info to learn about the underlying crypto concepts yourself.  When you're finished, you'll not only have learned a good deal about how cryptosystems are built, but you'll also understand how they're attacked.</p>
-</blockquote>
-<p>Solutions:</p>
+<h1 id="Set-7:-Hashes">Set 7: Hashes<a class="anchor-link" href="#Set-7:-Hashes">¶</a></h1><p>This is <strong>the first of two sets we generated after the original 6</strong>.</p>
+<p>Unlike the last few sets, <strong>this set is a hodge-podge</strong>.  It also includes some of the few challenges we have that probably aren't useful against real targets (they were fun enough to include anyways).  On the other hand, we also include a challenge that models the CRIME attack on TLS.</p>
+<p>This set is <strong>hard</strong>.  There's a significant amount of programming, and Wang's attack in particular is as difficult as anything we've done.</p>
 <ul>
-<li><a href="set-1.html">Set 1</a></li>
-<li><a href="set-2.html">Set 2</a></li>
-<li><a href="set-3.html">Set 3</a></li>
-<li><a href="set-4.html">Set 4</a></li>
-<li><a href="set-5.html">Set 5</a></li>
-<li><a href="set-6.html">Set 6</a></li>
-<li><a href="set-7.html">Set 7</a> (in progress)</li>
+<li><a href="#Preliminaries">Preliminaries</a></li>
+<li><a href="#Challenge-49:-CBC-MAC-message-forgery">Challenge 49: CBC-MAC message forgery</a></li>
+<li><a href="#Challenge-50:-Hashing-with-CBC-MAC">Challenge 50: Hashing with CBC-MAC</a></li>
+<li><a href="#Challenge-51:-Compression-ratio-side-channel-attacks">Challenge 51: Compression ratio side-channel attacks</a></li>
 </ul>
+<h2 id="Preliminaries">Preliminaries<a class="anchor-link" href="#Preliminaries">¶</a></h2>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell jp-mod-noOutputs" id="cell-id=cf7a9bba-1d0c-4f05-9cd0-914ad13b32af">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [1]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">random</span><span class="w"> </span><span class="kn">import</span> <span class="n">randbytes</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">zlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">compress</span>
+
+<span class="c1"># From pyca/cryptography</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">cryptography.hazmat.primitives</span><span class="w"> </span><span class="kn">import</span> <span class="n">padding</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">cryptography.hazmat.primitives.ciphers</span><span class="w"> </span><span class="kn">import</span> <span class="n">Cipher</span><span class="p">,</span> <span class="n">algorithms</span><span class="p">,</span> <span class="n">modes</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">aes_128_ctr_crypt</span><span class="p">(</span><span class="n">text</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">nonce</span><span class="p">):</span>
+    <span class="c1"># Symmetric encryption/decryption</span>
+    <span class="n">encryptor</span> <span class="o">=</span> <span class="n">Cipher</span><span class="p">(</span><span class="n">algorithms</span><span class="o">.</span><span class="n">AES128</span><span class="p">(</span><span class="n">key</span><span class="p">),</span> <span class="n">modes</span><span class="o">.</span><span class="n">CTR</span><span class="p">(</span><span class="n">nonce</span><span class="p">))</span><span class="o">.</span><span class="n">encryptor</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">encryptor</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">text</span><span class="p">)</span> <span class="o">+</span> <span class="n">encryptor</span><span class="o">.</span><span class="n">finalize</span><span class="p">()</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">pad_pkcs7</span><span class="p">(</span><span class="n">text</span><span class="p">):</span>
+    <span class="n">padder</span> <span class="o">=</span> <span class="n">padding</span><span class="o">.</span><span class="n">PKCS7</span><span class="p">(</span><span class="mi">128</span><span class="p">)</span><span class="o">.</span><span class="n">padder</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">padder</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">text</span><span class="p">)</span> <span class="o">+</span> <span class="n">padder</span><span class="o">.</span><span class="n">finalize</span><span class="p">()</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">aes_128_cbc_encrypt</span><span class="p">(</span><span class="n">ptext</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">iv</span><span class="p">):</span>
+    <span class="n">encryptor</span> <span class="o">=</span> <span class="n">Cipher</span><span class="p">(</span><span class="n">algorithms</span><span class="o">.</span><span class="n">AES128</span><span class="p">(</span><span class="n">key</span><span class="p">),</span> <span class="n">modes</span><span class="o">.</span><span class="n">CBC</span><span class="p">(</span><span class="n">iv</span><span class="p">))</span><span class="o">.</span><span class="n">encryptor</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">encryptor</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">pad_pkcs7</span><span class="p">(</span><span class="n">ptext</span><span class="p">))</span> <span class="o">+</span> <span class="n">encryptor</span><span class="o">.</span><span class="n">finalize</span><span class="p">()</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">xor</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">):</span>
+    <span class="k">return</span> <span class="nb">bytes</span><span class="p">(</span><span class="n">xb</span><span class="o">^</span><span class="n">yb</span> <span class="k">for</span> <span class="n">xb</span><span class="p">,</span> <span class="n">yb</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">))</span>
+
+<span class="n">zero</span> <span class="o">=</span> <span class="nb">bytes</span><span class="p">(</span><span class="mi">16</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=ef67f8fe-ff49-444a-a1ac-42e961912788">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<h2 id="Challenge-49:-CBC-MAC-message-forgery">Challenge 49: CBC-MAC message forgery<a class="anchor-link" href="#Challenge-49:-CBC-MAC-message-forgery">¶</a></h2><p>Let's talk about CBC-MAC.</p>
+<p>CBC-MAC is like this:</p>
+<ol>
+<li>Take the plaintext P.</li>
+<li>Encrypt P under CBC with key K, yielding ciphertext C.</li>
+<li>Chuck all of C but the last block C[n].</li>
+<li>C[n] is the MAC.</li>
+</ol>
+<p>Suppose there's an online banking application, and it carries out user requests by talking to an API server over the network.  Each request looks like this:</p>
+<pre><code>message || IV || MAC
+</code></pre>
+<p>The message looks like this:</p>
+<pre><code>from=#{from_id}&amp;to=#{to_id}&amp;amount=#{amount}
+</code></pre>
+<p>Now, write an API server and a web frontend for it.  (NOTE: No need to get ambitious and write actual servers and web apps.  Totally fine to go lo-fi on this one.)  The client and server should share a secret key K to sign and verify messages.</p>
+<p>The API server should accept messages, verify signatures, and carry out each transaction if the MAC is valid.  It's also publicly exposed - the attacker can submit messages freely assuming he can forge the right MAC.</p>
+<p>The web client should allow the attacker to generate valid messages for accounts he controls.  (Feel free to sanitize params if you're feeling anal-retentive.)  Assume the attacker is in a position to capture and inspect messages from the client to the API server.</p>
+<p>One thing we haven't discussed is the IV.  Assume the client generates a per-message IV and sends it along with the MAC.  That's how CBC works, right?</p>
+<p>Wrong.</p>
+<p>For messages signed under CBC-MAC, an attacker-controlled IV is a liability.  Why?  Because it yields full control over the first block of the message.</p>
+<p>Use this fact to generate a message transferring 1M spacebucks from a target victim's account into your account.</p>
+<p>I'll wait. Just let me know when you're done.</p>
+<p>... waiting</p>
+<p>... waiting</p>
+<p>... waiting</p>
+<p>All done?  Great - I knew you could do it!</p>
+<hr/>
+<p>This challenge and the next appear to have been inspired by Matthew Green's blog post, <a href="https://blog.cryptographyengineering.com/2013/02/15/why-i-hate-cbc-mac/">Why I hate CBC-MAC</a>.  The attack here is trivial to implement, but it seems of limited value since only the first block (16 bytes) of the message can be modified.  Still, the first block can be modified at will.  Here it is convenient to refer back to how CBC mode works:</p>
+<p><img alt="" src="cbc-mode.png"/></p>
+<p>Let $O$ be the first block of the original message, $I$ the initialization vector, and $O'$ the desired replacement block.  Since the first ciphertext block is computed by encrypting $I \oplus O$, we can just replace that with $I' \oplus O'$ where $I' = I \oplus O \oplus O'$ to recreate the original CBC-MAC computation.</p>
+<p>But the requested forgery doesn't seem realistically possible.  Given the message syntax and a reasonable length for account IDs, the recipient account won't occur within the first 16 bytes.  And even if it does, how could one modify the amount, which occurs even later in the message?  Another solver suggested submitting a legitimate, innocuous request first, <code>from=attacker_id&amp;to=attacker_id&amp;amount=1000000</code>, and then modifying the sender, not the recipient.  But this assumes that the server would allow such requests, and that the attacker has sufficient funds to support it.</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=4bb2009f-22af-462e-b814-1c22467af1d3">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [2]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="n">key</span> <span class="o">=</span> <span class="n">randbytes</span><span class="p">(</span><span class="mi">16</span><span class="p">)</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">cbc_mac</span><span class="p">(</span><span class="n">text</span><span class="p">,</span> <span class="n">iv</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">aes_128_cbc_encrypt</span><span class="p">(</span><span class="n">text</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">iv</span><span class="p">)[</span><span class="o">-</span><span class="mi">16</span><span class="p">:]</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">authenticate</span><span class="p">(</span><span class="n">text</span><span class="p">,</span> <span class="n">iv</span><span class="p">,</span> <span class="n">mac</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">cbc_mac</span><span class="p">(</span><span class="n">text</span><span class="p">,</span> <span class="n">iv</span><span class="p">)</span> <span class="o">==</span> <span class="n">mac</span>
+
+<span class="c1">#                  |..............|  &lt;-- first block</span>
+<span class="n">message</span> <span class="o">=</span>        <span class="sa">b</span><span class="s2">"from=Bob&amp;to=Dave&amp;amount=5"</span>
+<span class="n">forged_message</span> <span class="o">=</span> <span class="sa">b</span><span class="s2">"from=Bob&amp;to=Greg&amp;amount=5"</span>
+
+<span class="c1"># The message and the following are intercepted...</span>
+<span class="n">iv</span> <span class="o">=</span> <span class="n">randbytes</span><span class="p">(</span><span class="mi">16</span><span class="p">)</span>
+<span class="n">mac</span> <span class="o">=</span> <span class="n">cbc_mac</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="n">iv</span><span class="p">)</span>
+
+<span class="n">forged_iv</span> <span class="o">=</span> <span class="n">xor</span><span class="p">(</span><span class="n">xor</span><span class="p">(</span><span class="n">iv</span><span class="p">,</span> <span class="n">message</span><span class="p">[:</span><span class="mi">16</span><span class="p">]),</span> <span class="n">forged_message</span><span class="p">[:</span><span class="mi">16</span><span class="p">])</span>
+
+<span class="c1"># And the server will accept...</span>
+<span class="n">authenticate</span><span class="p">(</span><span class="n">forged_message</span><span class="p">,</span> <span class="n">forged_iv</span><span class="p">,</span> <span class="n">mac</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child jp-OutputArea-executeResult">
+<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[2]:</div>
+<div class="jp-RenderedText jp-OutputArea-output jp-OutputArea-executeResult" data-mime-type="text/plain" tabindex="0">
+<pre>True</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=14bfb17c-cdcf-4cf0-9697-12eb95d93453">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<p>Now let's tune up that protocol a little bit.</p>
+<p>As we now know, you're supposed to use a fixed IV with CBC-MAC, so let's do that.  We'll set ours at 0 for simplicity.  This means the IV comes out of the protocol:</p>
+<pre><code>message || MAC
+</code></pre>
+<p>Pretty simple, but we'll also adjust the message.  For the purposes of efficiency, the bank wants to be able to process multiple transactions in a single request.  So the message now looks like this:</p>
+<pre><code>from=#{from_id}&amp;tx_list=#{transactions}
+</code></pre>
+<p>With the transaction list formatted like:</p>
+<pre><code>to:amount(;to:amount)*
+</code></pre>
+<p>There's still a weakness here: the MAC is vulnerable to length extension attacks.  How?</p>
+<p>Well, the output of CBC-MAC is a valid IV for a new message.</p>
+<p>"<em>But we don't control the IV anymore!</em>"</p>
+<p>With sufficient mastery of CBC, we can fake it.</p>
+<p>Your mission: capture a valid message from your target user.  Use length extension to add a transaction paying the attacker's account 1M spacebucks.</p>
+<blockquote>
+<p><strong>Hint!</strong></p>
+<p>This would be a lot easier if you had full control over the first block of your message, huh?  Maybe you can simulate that.</p>
+</blockquote>
+<p>Food for thought: <em>How would you modify the protocol to prevent this?</em></p>
+<hr/>
+<p>This attack seems even less feasible than the previous one.  It's a variation on <a href="#Challenge-50:-Hashing-with-CBC-MAC">Challenge 50</a>, next, which we explore fully.  We'll just note here that a successful attack would require two things to happen:</p>
+<ul>
+<li><p>The attacker must compute the CBC-MAC of the extension (by itself) in which the first block has been XOR-ed with the original message's CBC-MAC.  Thus the client would have to be willing to sign, not just a message that it did not originate, but a message that appears to it to be just a string of arbitrary bytes.</p>
+</li>
+<li><p>The computation of the original message's CBC-MAC incorporated PKCS#7 padding, and that padding would have to be manually inserted between the original message and the extension in order to make the CBC-MAC computation come out right.  Thus the server would have to accept a request with padding bytes in the middle.</p>
+</li>
+</ul>
+<p>Both those requirements seem unrealistic.</p>
+<p>How can length extension attacks be prevented?  Simply by including some kind of end-of-request marker in the syntax.</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=6b3d4725-7e60-4205-af9e-9da464c710c2">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [3]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="n">message</span> <span class="o">=</span> <span class="sa">b</span><span class="s2">"from=Bob&amp;tx_list=Dave:5"</span>
+<span class="n">mac</span> <span class="o">=</span> <span class="n">cbc_mac</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="n">iv</span><span class="o">=</span><span class="n">zero</span><span class="p">)</span>
+
+<span class="n">extension</span> <span class="o">=</span> <span class="sa">b</span><span class="s2">";Greg:1000000"</span>
+
+<span class="c1"># The scenario calls for us to compute the CBC-MAC of the extension in</span>
+<span class="c1"># which the first block has been XOR-ed with `mac` above, and using</span>
+<span class="c1"># IV=0, but for brevity we note that that is mathematically equivalent</span>
+<span class="c1"># to this call.</span>
+<span class="n">new_mac</span> <span class="o">=</span> <span class="n">cbc_mac</span><span class="p">(</span><span class="n">extension</span><span class="p">,</span> <span class="n">iv</span><span class="o">=</span><span class="n">mac</span><span class="p">)</span>
+
+<span class="n">forged_message</span> <span class="o">=</span> <span class="n">pad_pkcs7</span><span class="p">(</span><span class="n">message</span><span class="p">)</span> <span class="o">+</span> <span class="n">extension</span>
+
+<span class="n">authenticate</span><span class="p">(</span><span class="n">forged_message</span><span class="p">,</span> <span class="n">iv</span><span class="o">=</span><span class="n">zero</span><span class="p">,</span> <span class="n">mac</span><span class="o">=</span><span class="n">new_mac</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child jp-OutputArea-executeResult">
+<div class="jp-OutputPrompt jp-OutputArea-prompt">Out[3]:</div>
+<div class="jp-RenderedText jp-OutputArea-output jp-OutputArea-executeResult" data-mime-type="text/plain" tabindex="0">
+<pre>True</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=505a9b0a-8a5d-4793-96f4-f7c53612a1b8">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<p>So it works.  But here's the message the server would have to accept:</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=67ba6b37-13ff-45e0-94b8-357d8b1cd953">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [4]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="n">forged_message</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>b'from=Bob&amp;tx_list=Dave:5\t\t\t\t\t\t\t\t\t;Greg:1000000'
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=21fb5385-4f9b-47a7-b9ed-8fd14b0bc4fe">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<h2 id="Challenge-50:-Hashing-with-CBC-MAC">Challenge 50: Hashing with CBC-MAC<a class="anchor-link" href="#Challenge-50:-Hashing-with-CBC-MAC">¶</a></h2><p>Sometimes people try to use CBC-MAC as a hash function.</p>
+<p>This is a bad idea.  Matt Green explains:</p>
+<blockquote>
+<p>To make a long story short: cryptographic hash functions are public functions (i.e., no secret key) that have the property of collision-resistance (it's hard to find two messages with the same hash).  MACs are keyed functions that (typically) provide message unforgeability -- a very different property.  Moreover, they guarantee this only when the key is secret.</p>
+</blockquote>
+<p>Let's try a simple exercise.</p>
+<p>Hash functions are often used for code verification.  This snippet of JavaScript (with newline):</p>
+<pre><code>alert('MZA who was that?');
+</code></pre>
+<p>Hashes to <em>296b8d7cb78a243dda4d0a61d33bbdd1</em> under CBC-MAC with a key of "<em>YELLOW SUBMARINE</em>" and a 0 IV.</p>
+<p>Forge a valid snippet of JavaScript that alerts "Ayo, the Wu is back!" and hashes to the same value.  Ensure that it runs in a browser.</p>
+<hr/>
+<p>JavaScript has the convenient property that a <a href="https://262.ecma-international.org/16.0/index.html#sec-comments">single-line comment</a> (delimited with "//") extends up to the next newline character and can contain <em>any</em> characters, in fact any bytes (other than newline) along the way.  Since the CBC-MAC consists of just the last ciphertext block, the idea is that we add to our forged code (regardless what it does, regardless how long it is) a comment that causes the MAC to turn out right.  Referring again to how CBC mode works:</p>
+<p><img alt="" src="cbc-mode.png"/></p>
+<p>Let $F$ be the forged code with "//" appended and let $C_F$ be the CBC-MAC of $F$, i.e., its last ciphertext block.  Note that in computing $C_F$ the encryption process will have added some PKCS#7 padding bytes; call this padding $P$.  Let $O$ be just the first block (i.e., 16 bytes) of the original code.  Let $O' = C_F \oplus O$.  Consider manually padding $F$ and encrypting $F \parallel P \parallel O'$.  In computing the ciphertext block corresponding to $O'$ we will be encrypting $C_F \oplus O' = C_F \oplus (C_F \oplus O) = O$.  I.e., we will have recreated the start of the original CBC-MAC computation.  From this point, if we append the remainder of the original code (i.e., from the second block on) verbatim we will wind up matching the original CBC-MAC.</p>
+<p>There are two potential problems.  One, if 10 PKCS#7 padding bytes are required we will end up appending newline (ASCII 10) bytes to $F$, which will mess up our commenting mechanism.  Two, it may happen that a newline appears in $O'$.  We don't address these problems here, but they could both be handled by making some kind of innocuous change to the forged code.  And there is one limitation: we're assuming the original code consists of a single line, so that its actions can be disabled by a single comment delimiter.  If the original code has multiple lines, we will be commenting out only the first line.  Our approach requires that the original code appear at the end of the plaintext verbatim, so we can't add further comment delimiters.  A potential workaround would be to add some kind of quit or exit call at the end of the forged code, to avoid running the original code, but the success of this approach would seem to depend on the particulars of the original code (e.g., that commenting out the first line does not create a syntax error).</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=5729cb96-9984-4f32-b73b-353f10dabea8">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [5]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">cbc_mac_hash</span><span class="p">(</span><span class="n">text</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">aes_128_cbc_encrypt</span><span class="p">(</span><span class="n">text</span><span class="p">,</span> <span class="sa">b</span><span class="s2">"YELLOW SUBMARINE"</span><span class="p">,</span> <span class="n">zero</span><span class="p">)[</span><span class="o">-</span><span class="mi">16</span><span class="p">:]</span>
+
+<span class="n">original_code</span> <span class="o">=</span> <span class="sa">b</span><span class="s2">"alert('MZA who was that?');</span><span class="se">\n</span><span class="s2">"</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">cbc_mac_hash</span><span class="p">(</span><span class="n">original_code</span><span class="p">)</span><span class="o">.</span><span class="n">hex</span><span class="p">())</span>
+
+<span class="n">forged_code</span> <span class="o">=</span> <span class="sa">b</span><span class="s2">"alert('Ayo, the Wu is back!');</span><span class="se">\n</span><span class="s2">"</span> <span class="o">+</span> <span class="sa">b</span><span class="s2">"//"</span>
+<span class="n">C_f</span> <span class="o">=</span> <span class="n">cbc_mac_hash</span><span class="p">(</span><span class="n">forged_code</span><span class="p">)</span>
+<span class="n">forged_code</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">pad_pkcs7</span><span class="p">(</span><span class="n">forged_code</span><span class="p">)</span> <span class="o">+</span>
+    <span class="n">xor</span><span class="p">(</span><span class="n">C_f</span><span class="p">,</span> <span class="n">original_code</span><span class="p">[:</span><span class="mi">16</span><span class="p">])</span> <span class="o">+</span>
+    <span class="n">original_code</span><span class="p">[</span><span class="mi">16</span><span class="p">:]</span>
+<span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="n">cbc_mac_hash</span><span class="p">(</span><span class="n">forged_code</span><span class="p">)</span><span class="o">.</span><span class="n">hex</span><span class="p">())</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>296b8d7cb78a243dda4d0a61d33bbdd1
+296b8d7cb78a243dda4d0a61d33bbdd1
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=3df6d4b8-6462-4116-b36c-0c38b4b81b04">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<p>The forged code looks like this:</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=26679e7c-d98c-4554-8d60-6745bf44ca34">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [6]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="n">forged_code</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>b'alert(\'Ayo, the Wu is back!\');\n//\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f\x0f\xe3l\xa7\xc1BR\x0c\xa8Dy"8tA\xaa~as that?\');\n'
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=3db61a7d-d233-4069-abe6-885dc8b8168b">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<h2 id="Challenge-51:-Compression-ratio-side-channel-attacks">Challenge 51: Compression ratio side-channel attacks<a class="anchor-link" href="#Challenge-51:-Compression-ratio-side-channel-attacks">¶</a></h2><p>Internet traffic is often compressed to save bandwidth.  Until recently, this included HTTPS headers, and it still includes the contents of responses.</p>
+<p>Why does that matter?</p>
+<p>Well, if you're an attacker with:</p>
+<ol>
+<li>Partial plaintext knowledge <em>and</em></li>
+<li>Partial plaintext control <em>and</em></li>
+<li>Access to a compression oracle</li>
+</ol>
+<p>You've got a pretty good chance to recover any additional unknown plaintext.</p>
+<p>What's a compression oracle?  You give it some input and it tells you how well the full message compresses, i.e., the length of the resultant output.</p>
+<p>This is somewhat similar to the timing attacks we did way back in <a href="set-4.html">set 4</a> in that we're taking advantage of incidental side channels rather than attacking the cryptographic mechanisms themselves.</p>
+<p>Scenario: you are running a MITM attack with an eye towards stealing secure session cookies.  You've injected malicious content allowing you to spawn arbitrary requests and observe them in flight.  (The particulars aren't terribly important, just roll with it.)</p>
+<p>So!  Write this oracle:</p>
+<pre><code>oracle(P) -&gt; length(encrypt(compress(format_request(P))))
+</code></pre>
+<p>Format the request like this:</p>
+<pre><code>POST / HTTP/1.1
+Host: hapless.com
+Cookie: sessionid=TmV2ZXIgcmV2ZWFsIHRoZSBXdS1UYW5nIFNlY3JldCE=
+Content-Length: ((len(P)))
+((P))
+</code></pre>
+<p>(Pretend you can't see that session id.  You're the attacker.)</p>
+<p>Compress using zlib or whatever.</p>
+<p>Encryption... is actually kind of irrelevant for our purposes, but be a sport.  Just use some stream cipher.  Dealer's choice.  Random key/IV on every call to the oracle.</p>
+<p>And then just return the length in bytes.</p>
+<p>Now, the idea here is to leak information using the compression library.  A payload of "sessionid=T" should compress just a little bit better than, say, "sessionid=S".</p>
+<p>There is one complicating factor.  The DEFLATE algorithm operates in terms of individual bits, but the final message length will be in bytes.  Even if you do find a better compression, the difference may not cross a byte boundary.  So that's a problem.</p>
+<p>You may also get some incidental false positives.</p>
+<p>But don't worry!  I have full confidence in you.</p>
+<p>Use the compression oracle to recover the session id.</p>
+<p>I'll wait.</p>
+<p>Got it?  Great.</p>
+<hr/>
+<p>The session key is "Never reveal the Wu-Tang Secret!" Base64-encoded.</p>
+<p>This attack was perhaps first described, abstractly, by John Kelsey in 2002 in <a href="https://doi.org/10.1007/3-540-45661-9_21">Compression and Information Leakage of Plaintext</a> and then exploited a decade later in the <a href="https://en.wikipedia.org/wiki/CRIME">CRIME</a> and <a href="https://en.wikipedia.org/wiki/BREACH">BREACH</a> attacks on web browsers.  The challenge here describes it as a MITM attack, but it's better characterized as one in which the attacker can supply input to a system, have that input reflected in the (compressed) output from that system, and observe the length of the output.  If the system is a web browser, the input could be supplied in the body of a POST request (as suggested here) or in the URL itself (i.e., just visit URL /sessionid=...); the output length could be determined by packet sniffing.  If the system is a web server, then the attack would rely on the server reflecting the input in the response.</p>
+<p>The only protection seems to be to disable compression.</p>
+<p>Fundamentally, the attack works because the <a href="https://zlib.net/feldspar.html">DEFLATE/LZ77 algorithm</a> used by zlib will replace a previously-seen substring within a sliding window with a back reference to the earlier occurrence.  Here we're relying on the existence of an anchor of known bytes to provide the match the algorithm is looking for, e.g., <code>sessionid=</code>.  We input such an anchor, and if some number of bytes following that anchor match the full and correct session ID already embedded in the message, then fewer bits will be required to compress the subsequent bytes that do not match.  In developing our solution we found that we were able to consistently recover the session ID one byte at a time using anchor <code>Cookie: sessionid=</code>, whereas using just anchor <code>sessionid=</code> we had to guess two bytes at a time.</p>
+<p>The padding argument will be used in the second part of this challenge.</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=edfbf732-aa53-422f-821a-8dcd7db9d77f">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [7]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="n">session_id</span> <span class="o">=</span> <span class="sa">b</span><span class="s2">"TmV2ZXIgcmV2ZWFsIHRoZSBXdS1UYW5nIFNlY3JldCE="</span>
+
+<span class="n">base64_alphabet</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="sa">b</span><span class="s2">"ABCDEFGHIJKLMNOPQRSTUVWXYZ"</span>
+    <span class="sa">b</span><span class="s2">"abcdefghijklmnopqrstuvwxyz"</span>
+    <span class="sa">b</span><span class="s2">"0123456789/+="</span>
+<span class="p">)</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">format_request</span><span class="p">(</span><span class="n">data</span><span class="p">):</span>
+    <span class="n">header</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="s2">"POST / HTTP/1.1</span><span class="se">\r\n</span><span class="s2">"</span>
+        <span class="s2">"Host: hapless.com</span><span class="se">\r\n</span><span class="s2">"</span>
+        <span class="s2">"Cookie: sessionid=</span><span class="si">{session_id}</span><span class="se">\r\n</span><span class="s2">"</span>
+        <span class="s2">"Content-Length: </span><span class="si">{length}</span><span class="se">\r\n</span><span class="s2">"</span>
+        <span class="s2">"</span><span class="se">\r\n</span><span class="s2">"</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">header</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+        <span class="n">session_id</span><span class="o">=</span><span class="n">session_id</span><span class="o">.</span><span class="n">decode</span><span class="p">(),</span>
+        <span class="n">length</span><span class="o">=</span><span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">()</span> <span class="o">+</span> <span class="n">data</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">oracle</span><span class="p">(</span><span class="n">data</span><span class="p">):</span>
+    <span class="n">key</span> <span class="o">=</span> <span class="n">randbytes</span><span class="p">(</span><span class="mi">16</span><span class="p">)</span>
+    <span class="n">nonce</span> <span class="o">=</span> <span class="n">randbytes</span><span class="p">(</span><span class="mi">16</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="n">aes_128_ctr_crypt</span><span class="p">(</span><span class="n">compress</span><span class="p">(</span><span class="n">format_request</span><span class="p">(</span><span class="n">data</span><span class="p">)),</span> <span class="n">key</span><span class="p">,</span> <span class="n">nonce</span><span class="p">))</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">recover_session_id</span><span class="p">(</span><span class="n">add_padding</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+    <span class="nb">id</span> <span class="o">=</span> <span class="nb">bytes</span><span class="p">()</span>
+    <span class="k">while</span> <span class="ow">not</span> <span class="nb">id</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="sa">b</span><span class="s2">"</span><span class="se">\r\n</span><span class="s2">"</span><span class="p">):</span>
+        <span class="n">padding</span> <span class="o">=</span> <span class="sa">b</span><span class="s2">""</span>
+        <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+            <span class="n">l</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="p">[</span><span class="n">oracle</span><span class="p">(</span><span class="n">padding</span> <span class="o">+</span> <span class="sa">b</span><span class="s2">"Cookie: sessionid="</span> <span class="o">+</span> <span class="nb">id</span> <span class="o">+</span> <span class="nb">bytes</span><span class="p">([</span><span class="n">b</span><span class="p">])),</span> <span class="n">b</span><span class="p">]</span>
+                <span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="n">base64_alphabet</span> <span class="o">+</span> <span class="sa">b</span><span class="s2">"</span><span class="se">\r\n</span><span class="s2">"</span>
+            <span class="p">]</span>
+            <span class="n">l</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">t</span><span class="p">:</span> <span class="n">t</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+            <span class="k">if</span> <span class="n">l</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">l</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]:</span>
+                <span class="c1"># There is a unique shortest compressed output</span>
+                <span class="nb">id</span> <span class="o">+=</span> <span class="nb">bytes</span><span class="p">([</span><span class="n">l</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">]])</span>
+                <span class="k">break</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">assert</span> <span class="n">add_padding</span>
+                <span class="n">padding</span> <span class="o">+=</span> <span class="n">randbytes</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nb">id</span><span class="p">[:</span><span class="o">-</span><span class="mi">2</span><span class="p">]</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="n">recover_session_id</span><span class="p">()</span> <span class="o">==</span> <span class="n">session_id</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>True
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=423828fa-ef1f-4208-a893-db368347eec8">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<p>Now swap out your stream cipher for CBC and do it again.</p>
+<hr/>
+<p>A block cipher makes this quite a bit harder because the added PKCS#7 padding obscures the length of the nominally compressed output.  To counter this we add arbitrary content (designed to compress poorly, so as to have effect) one byte at a time, until, in testing all possibilities for the next byte of the session ID, there is one nominally compressed output that is shorter than the others, and which manages to make the corresponding encrypted output one block shorter.  In practice this required adding 30-60 bytes.</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=abcdc53d-0eb5-442d-a3b3-18d9a67908e1">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [8]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">oracle</span><span class="p">(</span><span class="n">data</span><span class="p">):</span>
+    <span class="n">key</span> <span class="o">=</span> <span class="n">randbytes</span><span class="p">(</span><span class="mi">16</span><span class="p">)</span>
+    <span class="n">iv</span> <span class="o">=</span> <span class="n">randbytes</span><span class="p">(</span><span class="mi">16</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="n">aes_128_cbc_encrypt</span><span class="p">(</span><span class="n">compress</span><span class="p">(</span><span class="n">format_request</span><span class="p">(</span><span class="n">data</span><span class="p">)),</span> <span class="n">key</span><span class="p">,</span> <span class="n">iv</span><span class="p">))</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="n">recover_session_id</span><span class="p">(</span><span class="n">add_padding</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="o">==</span> <span class="n">session_id</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>True
+</pre>
+</div>
 </div>
 </div>
 </div>
