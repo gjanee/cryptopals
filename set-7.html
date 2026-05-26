@@ -7525,6 +7525,7 @@ a.anchor-link {
 <li><a href="#Challenge-49:-CBC-MAC-message-forgery">Challenge 49: CBC-MAC message forgery</a></li>
 <li><a href="#Challenge-50:-Hashing-with-CBC-MAC">Challenge 50: Hashing with CBC-MAC</a></li>
 <li><a href="#Challenge-51:-Compression-ratio-side-channel-attacks">Challenge 51: Compression ratio side-channel attacks</a></li>
+<li><a href="#Challenge-52:-Iterated-hash-function-multicollisions">Challenge 52: Iterated hash function multicollisions</a></li>
 </ul>
 <h2 id="Preliminaries">Preliminaries<a class="anchor-link" href="#Preliminaries">¶</a></h2>
 </div>
@@ -7538,7 +7539,8 @@ a.anchor-link {
 <div class="jp-InputPrompt jp-InputArea-prompt">In [1]:</div>
 <div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
 <div class="cm-editor cm-s-jupyter">
-<div class="highlight hl-ipython3"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">random</span><span class="w"> </span><span class="kn">import</span> <span class="n">randbytes</span>
+<div class="highlight hl-ipython3"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">itertools</span><span class="w"> </span><span class="kn">import</span> <span class="n">islice</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">random</span><span class="w"> </span><span class="kn">import</span> <span class="n">randbytes</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">zlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">compress</span>
 
 <span class="c1"># From pyca/cryptography</span>
@@ -7554,9 +7556,11 @@ a.anchor-link {
     <span class="n">padder</span> <span class="o">=</span> <span class="n">padding</span><span class="o">.</span><span class="n">PKCS7</span><span class="p">(</span><span class="mi">128</span><span class="p">)</span><span class="o">.</span><span class="n">padder</span><span class="p">()</span>
     <span class="k">return</span> <span class="n">padder</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">text</span><span class="p">)</span> <span class="o">+</span> <span class="n">padder</span><span class="o">.</span><span class="n">finalize</span><span class="p">()</span>
 
-<span class="k">def</span><span class="w"> </span><span class="nf">aes_128_cbc_encrypt</span><span class="p">(</span><span class="n">ptext</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">iv</span><span class="p">):</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">aes_128_cbc_encrypt</span><span class="p">(</span><span class="n">ptext</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">iv</span><span class="p">,</span> <span class="n">padding</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">padding</span><span class="p">:</span>
+        <span class="n">ptext</span> <span class="o">=</span> <span class="n">pad_pkcs7</span><span class="p">(</span><span class="n">ptext</span><span class="p">)</span>
     <span class="n">encryptor</span> <span class="o">=</span> <span class="n">Cipher</span><span class="p">(</span><span class="n">algorithms</span><span class="o">.</span><span class="n">AES128</span><span class="p">(</span><span class="n">key</span><span class="p">),</span> <span class="n">modes</span><span class="o">.</span><span class="n">CBC</span><span class="p">(</span><span class="n">iv</span><span class="p">))</span><span class="o">.</span><span class="n">encryptor</span><span class="p">()</span>
-    <span class="k">return</span> <span class="n">encryptor</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">pad_pkcs7</span><span class="p">(</span><span class="n">ptext</span><span class="p">))</span> <span class="o">+</span> <span class="n">encryptor</span><span class="o">.</span><span class="n">finalize</span><span class="p">()</span>
+    <span class="k">return</span> <span class="n">encryptor</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">ptext</span><span class="p">)</span> <span class="o">+</span> <span class="n">encryptor</span><span class="o">.</span><span class="n">finalize</span><span class="p">()</span>
 
 <span class="k">def</span><span class="w"> </span><span class="nf">xor</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">):</span>
     <span class="k">return</span> <span class="nb">bytes</span><span class="p">(</span><span class="n">xb</span><span class="o">^</span><span class="n">yb</span> <span class="k">for</span> <span class="n">xb</span><span class="p">,</span> <span class="n">yb</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">))</span>
@@ -8037,6 +8041,205 @@ Content-Length: ((len(P)))
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>True
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=18627ea0-c331-4b66-98d7-adefb644babf">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<h2 id="Challenge-52:-Iterated-hash-function-multicollisions">Challenge 52: Iterated hash function multicollisions<a class="anchor-link" href="#Challenge-52:-Iterated-hash-function-multicollisions">¶</a></h2><p>While we're on the topic of hash functions...</p>
+<p>The major feature you want in your hash function is collision-resistance.  That is, it should be hard to generate collisions, and it should be really hard to generate a collision for a given hash (aka preimage).</p>
+<p>Iterated hash functions have a problem: the effort to generate lots of collisions scales sublinearly.</p>
+<p>What's an iterated hash function?  For all intents and purposes, we're talking about the Merkle-Damgard construction.  It looks like this:</p>
+<pre><code>function MD(M, H, C):
+  for M[i] in pad(M):
+    H := C(M[i], H)
+  return H
+</code></pre>
+<p>For message M, initial state H, and compression function C.</p>
+<p>This should look really familiar, because SHA-1 and MD4 are both in this category.  What's cool is you can use this formula to build a makeshift hash function out of some spare crypto primitives you have lying around (e.g. C = AES-128).</p>
+<p>Back on task: the cost of collisions scales sublinearly.  What does that mean?  If it's feasible to find one collision, it's probably feasible to find a lot.</p>
+<p>How?  For a given state H, find two blocks that collide.  Now take the resulting hash from this collision as your new H and repeat.  Recognize that with each iteration you can actually double your collisions by subbing in either of the two blocks for that slot.</p>
+<p>This means that if finding two colliding messages takes 2^(b/2) work (where b is the bit-size of the hash function), then finding 2^n colliding messages only takes n*2^(b/2) work.</p>
+<p>Let's test it.  First, build your own MD hash function.  We're going to be generating a LOT of collisions, so don't knock yourself out.  In fact, go out of your way to make it bad.  Here's one way:</p>
+<ol>
+<li>Take a fast block cipher and use it as C.</li>
+<li>Make H pretty small.  I won't look down on you if it's only 16 bits.  Pick some initial H.</li>
+<li>H is going to be the input key and the output block from C.  That means you'll need to pad it on the way in and drop bits on the way out.</li>
+</ol>
+<p>Now write the function f(n) that will generate 2^n collisions in this hash function.</p>
+<p>Why does this matter?  Well, one reason is that people have tried to strengthen hash functions by cascading them together.  Here's what I mean:</p>
+<ol>
+<li>Take hash functions f and g.</li>
+<li>Build h such that h(x) = f(x) || g(x).</li>
+</ol>
+<p>The idea is that if collisions in f cost 2^(b1/2) and collisions in g cost 2^(b2/2), collisions in h should come to the princely sum of 2^((b1+b2)/2).</p>
+<p>But now we know that's not true!</p>
+<p>Here's the idea:</p>
+<ol>
+<li>Pick the "cheaper" hash function.  Suppose it's f.</li>
+<li>Generate 2^(b2/2) colliding messages in f.</li>
+<li>There's a good chance your message pool has a collision in g.</li>
+<li>Find it.</li>
+</ol>
+<p>And if it doesn't, keep generating cheap collisions until you find it.</p>
+<p>Prove this out by building a more expensive (but not too expensive) hash function to pair with the one you just used.  Find a pair of messages that collide under both functions.  Measure the total number of calls to the collision function.</p>
+<hr/>
+<p>This is a fantastic lesson to learn.  The effect seen here fundamentally results from the <a href="https://en.wikipedia.org/wiki/Birthday_problem">Birthday paradox</a>.  Specifically, in the case of hash functions where the hash size is $b$ bits (i.e., the hash space is $2^b$ bins) the probability of finding a collision among $2^{b/2}$ random messages is approximately 50%.  See <a href="https://en.wikipedia.org/wiki/Birthday_attack">Birthday attack</a> for more information.</p>
+<p>The salient property of an iterated hash function $f$ is that the output value from hashing one block becomes the input value for hashing the next block.  Thus if $p_1$ and $p_2$ are two block-aligned messages and $h_0$ is the starting hash value, and if $f(p_1, h_0) = h_1$ and $f(p_2, h_1) = h_2$, then $f(p_1 \parallel p_2, h_0) = h_2$.</p>
+<p>To create an exponential number of messages that all collide under one hash function we exploit the chained nature of iterated hash functions in much the same way we exploited CBC-MAC.  Again, let $f$ be an iterated hash function and $h_0$ the starting hash value.  Suppose we find, by randomly probing, blocks (not necessarily messages, single blocks suffice) $p_1$ and $q_1$ such that $f(p_1, h_0) = f(q_1, h_0) = h_1$.  Then suppose we use $h_1$ as our new basis and find blocks $p_2$ and $q_2$ such that $f(p_2, h_1) = f(q_2, h_1) = h_2$.  Then we will in fact have found four messages that collide:</p>
+<p>$$
+\begin{eqnarray*}
+f(p_1 \parallel p_2, h_0) &amp;=&amp; \\
+f(p_1 \parallel q_2, h_0) &amp;=&amp; \\
+f(q_1 \parallel p_2, h_0) &amp;=&amp; \\
+f(q_1 \parallel q_2, h_0) &amp;=&amp; h_2
+\end{eqnarray*}
+$$</p>
+<p>If we continue in the same fashion and find blocks $p_3$ and $q_3$ such that $f(p_3, h_2) = f(q_3, h_2) = h_3$, the number of colliding messages doubles again.  For example, $p_1 \parallel q_2 \parallel p_3$ would be one such message that hashes to $h_3$.  Generally, after finding $n$ such collision pairs we can construct $2^n$ messages that all collide under $f$ to $h_n$ by choosing, for each block position $i$, whether to use block $p_i$ or $q_i$.  Suppose the hash size of $f$ is $b$ bits.  If we think of $2^{b/2}$ hash probes as the amount of "work" required to achieve at least a 50% chance of finding one collision, then we arrive at the conclusion given in the challenge, namely that with only $n \cdot 2^{b/2}$ "work" we can find $2^n$ colliding messages.</p>
+<p>If we look among these $2^n$ colliding messages for collision under a second hash function, $g$, we are aided once again by the Birthday paradox.  For simplicity assume the hash size of $g$ is also $b$ bits.  If $n$ is large enough (namely, $n \ge b/2$, so that $2^n \ge 2^{b/2}$) we have a 50% chance of finding a collision under $g$, and if we do then we will have found a collision under the combined hash function $f \parallel g$.  For $b = 16$, that means having to find only 8 collisions under $f$.  So, the challenge's conclusion holds: combining hash functions by concatenation does not significantly increase collision resistance.</p>
+<p>For our experiment here we use AES-128, CBC mode for $f$ and CTR mode (modified to operate on blocks) for $g$.  To turn these encryption functions into hash functions we do as the challenge suggests, and use $b = 16$ and pad (with zeros) and trim (to the first two bytes) as necessary.</p>
+<p>See Antoine Joux, <a href="https://doi.org/10.1007/978-3-540-28628-8_19">Multicollisions in Iterated Hash Functions.
+Application to Cascaded Constructions</a> for more discussion.  That paper says that 128-bit hash functions are deprecated as being too small.  Surely requiring $2^{64} \approx 10^{19}$ work is sufficient?  But perhaps the concern is that fewer hash probes will still result in a non-negligible probability of finding a collision.</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=1201c8d4-dcd9-4a5d-9984-4bf748a3fb61">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [9]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="n">b</span> <span class="o">=</span> <span class="mi">16</span>  <span class="c1"># hash size in bits</span>
+<span class="n">B</span> <span class="o">=</span> <span class="n">b</span><span class="o">//</span><span class="mi">8</span>  <span class="c1"># and bytes</span>
+<span class="n">key</span> <span class="o">=</span> <span class="sa">b</span><span class="s2">"YELLOW SUBMARINE"</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">MD</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="nb">hash</span><span class="p">,</span> <span class="n">encryption_fn</span><span class="p">):</span>
+    <span class="c1"># Assumes message is block-aligned.</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">message</span><span class="p">),</span> <span class="mi">16</span><span class="p">):</span>
+        <span class="nb">hash</span> <span class="o">=</span> <span class="n">encryption_fn</span><span class="p">(</span><span class="n">message</span><span class="p">[</span><span class="n">i</span><span class="p">:</span><span class="n">i</span><span class="o">+</span><span class="mi">16</span><span class="p">],</span> <span class="nb">hash</span><span class="o">+</span><span class="nb">bytes</span><span class="p">(</span><span class="mi">16</span><span class="o">-</span><span class="n">B</span><span class="p">))[:</span><span class="n">B</span><span class="p">]</span>
+    <span class="k">return</span> <span class="nb">hash</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">f</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="nb">hash</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">MD</span><span class="p">(</span>
+        <span class="n">message</span><span class="p">,</span>
+        <span class="nb">hash</span><span class="p">,</span>
+        <span class="k">lambda</span> <span class="n">b</span><span class="p">,</span> <span class="n">h</span><span class="p">:</span> <span class="n">aes_128_cbc_encrypt</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">h</span><span class="p">,</span> <span class="n">padding</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="p">)</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">g</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="nb">hash</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">MD</span><span class="p">(</span>
+        <span class="n">message</span><span class="p">,</span>
+        <span class="nb">hash</span><span class="p">,</span>
+        <span class="k">lambda</span> <span class="n">b</span><span class="p">,</span> <span class="n">h</span><span class="p">:</span> <span class="n">aes_128_ctr_crypt</span><span class="p">(</span><span class="n">b</span><span class="p">,</span> <span class="n">key</span><span class="p">,</span> <span class="n">h</span><span class="p">)</span>
+    <span class="p">)</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">collisions_gen</span><span class="p">(</span><span class="n">message_gen</span><span class="p">,</span> <span class="n">hash_fn</span><span class="p">,</span> <span class="n">num_hashes</span><span class="p">):</span>
+    <span class="c1"># Drawing messages from `message_gen`, yield collision pairs</span>
+    <span class="c1"># (p_1, q_1), (p_2, q_2), ... as described above.  `num_hashes[0]`</span>
+    <span class="c1"># is updated to count the number of hashes required to find the</span>
+    <span class="c1"># collisions.</span>
+    <span class="n">seen</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">ih</span> <span class="o">=</span> <span class="nb">bytes</span><span class="p">(</span><span class="n">B</span><span class="p">)</span>  <span class="c1"># input hash value</span>
+    <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">m</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="n">message_gen</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">StopIteration</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="n">h</span> <span class="o">=</span> <span class="n">hash_fn</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="n">ih</span><span class="p">)</span>
+        <span class="n">num_hashes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">if</span> <span class="n">h</span> <span class="ow">in</span> <span class="n">seen</span><span class="p">:</span>
+            <span class="k">yield</span> <span class="n">seen</span><span class="p">[</span><span class="n">h</span><span class="p">],</span> <span class="n">m</span>
+            <span class="n">seen</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+            <span class="n">ih</span> <span class="o">=</span> <span class="n">h</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">seen</span><span class="p">[</span><span class="n">h</span><span class="p">]</span> <span class="o">=</span> <span class="n">m</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">random_gen</span><span class="p">():</span>
+    <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+        <span class="k">yield</span> <span class="n">randbytes</span><span class="p">(</span><span class="mi">16</span><span class="p">)</span>
+
+<span class="n">num_pairs</span> <span class="o">=</span> <span class="n">b</span><span class="o">//</span><span class="mi">2</span> <span class="o">+</span> <span class="mi">2</span>  <span class="c1"># see discussion below</span>
+
+<span class="n">num_hashes</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">pairs</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">islice</span><span class="p">(</span><span class="n">collisions_gen</span><span class="p">(</span><span class="n">random_gen</span><span class="p">(),</span> <span class="n">f</span><span class="p">,</span> <span class="n">num_hashes</span><span class="p">),</span> <span class="n">num_pairs</span><span class="p">))</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">"Number of hashes required to find one collision..."</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"    Estimated number, 50% probability: </span><span class="si">{</span><span class="mi">2</span><span class="o">**</span><span class="p">(</span><span class="n">b</span><span class="o">//</span><span class="mi">2</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"    Average observed: </span><span class="si">{</span><span class="n">num_hashes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">//</span><span class="n">num_pairs</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>Number of hashes required to find one collision...
+    Estimated number, 50% probability: 256
+    Average observed: 365
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=bf89e604-62bd-437c-a955-ce5fd6783aac">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<p>How many collision pairs are required to generate a large enough message pool to find a collision under $g$?  In practice we observed that starting with $b/2 = 8$ we found a collision about 25% of the time; adding a 9th pair, about 75% of the time; and adding a 10th pair, for a pool size of 1,024 messages, 99% of the time.</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=fbd69176-227a-447d-bfae-d31806c0c768">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [10]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">combinatorial_gen</span><span class="p">(</span><span class="n">pairs</span><span class="p">):</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="o">**</span><span class="nb">len</span><span class="p">(</span><span class="n">pairs</span><span class="p">)):</span>
+        <span class="n">m</span> <span class="o">=</span> <span class="sa">b</span><span class="s2">""</span>
+        <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">pairs</span><span class="p">)):</span>
+            <span class="n">m</span> <span class="o">+=</span> <span class="n">pairs</span><span class="p">[</span><span class="n">j</span><span class="p">][</span><span class="n">i</span><span class="o">&amp;</span><span class="p">(</span><span class="mi">2</span><span class="o">**</span><span class="n">j</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">]</span>
+        <span class="k">yield</span> <span class="n">m</span>
+
+<span class="n">num_hashes</span> <span class="o">=</span> <span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">found</span> <span class="o">=</span> <span class="nb">any</span><span class="p">(</span><span class="n">collisions_gen</span><span class="p">(</span><span class="n">combinatorial_gen</span><span class="p">(</span><span class="n">pairs</span><span class="p">),</span> <span class="n">g</span><span class="p">,</span> <span class="n">num_hashes</span><span class="p">))</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Found collision under g: </span><span class="si">{</span><span class="n">found</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Number of messages hashed: </span><span class="si">{</span><span class="n">num_hashes</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>Found collision under g: True
+Number of messages hashed: 42
 </pre>
 </div>
 </div>
