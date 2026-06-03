@@ -7526,6 +7526,8 @@ a.anchor-link {
 <li><a href="#Challenge-50:-Hashing-with-CBC-MAC">Challenge 50: Hashing with CBC-MAC</a></li>
 <li><a href="#Challenge-51:-Compression-ratio-side-channel-attacks">Challenge 51: Compression ratio side-channel attacks</a></li>
 <li><a href="#Challenge-52:-Iterated-hash-function-multicollisions">Challenge 52: Iterated hash function multicollisions</a></li>
+<li><a href="#Challenge-53:-Kelsey-and-Schneier%27s-expandable-messages">Challenge 53: Kelsey and Schneier's expandable messages</a></li>
+<li><a href="#Challenge-54:-Kelsey-and-Kohno%27s-Nostradamus-attack">Challenge 54: Kelsey and Kohno's Nostradamus attack</a></li>
 </ul>
 <h2 id="Preliminaries">Preliminaries<a class="anchor-link" href="#Preliminaries">¶</a></h2>
 </div>
@@ -7542,6 +7544,9 @@ a.anchor-link {
 <div class="highlight hl-ipython3"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">itertools</span><span class="w"> </span><span class="kn">import</span> <span class="n">islice</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">random</span><span class="w"> </span><span class="kn">import</span> <span class="n">randbytes</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">zlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">compress</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
 
 <span class="c1"># From pyca/cryptography</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">cryptography.hazmat.primitives</span><span class="w"> </span><span class="kn">import</span> <span class="n">padding</span>
@@ -7599,7 +7604,7 @@ a.anchor-link {
 <p>Wrong.</p>
 <p>For messages signed under CBC-MAC, an attacker-controlled IV is a liability.  Why?  Because it yields full control over the first block of the message.</p>
 <p>Use this fact to generate a message transferring 1M spacebucks from a target victim's account into your account.</p>
-<p>I'll wait. Just let me know when you're done.</p>
+<p>I'll wait.  Just let me know when you're done.</p>
 <p>... waiting</p>
 <p>... waiting</p>
 <p>... waiting</p>
@@ -8189,7 +8194,7 @@ Application to Cascaded Constructions</a> for more discussion.  That paper says 
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>Number of hashes required to find one collision...
     Estimated number, 50% probability: 256
-    Average observed: 365
+    Average observed: 398
 </pre>
 </div>
 </div>
@@ -8239,7 +8244,478 @@ Application to Cascaded Constructions</a> for more discussion.  That paper says 
 <div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
 <div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
 <pre>Found collision under g: True
-Number of messages hashed: 42
+Number of messages hashed: 143
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=8b2f6a2b-bb7d-4dbe-9cb3-d7bc0e1d80f4">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<h2 id="Challenge-53:-Kelsey-and-Schneier's-expandable-messages">Challenge 53: Kelsey and Schneier's expandable messages<a class="anchor-link" href="#Challenge-53:-Kelsey-and-Schneier's-expandable-messages">¶</a></h2><p>One of the basic yardsticks we use to judge a cryptographic hash function is its resistance to second preimage attacks.  That means that if I give you x and y such that H(x) = y, you should have a tough time finding x' such that H(x') = H(x) = y.</p>
+<p>How tough?  Brute-force tough.  For a 2^b hash function, we want second preimage attacks to cost 2^b operations.</p>
+<p>This turns out not to be the case for very long messages.</p>
+<p>Consider the problem we're trying to solve: we want to find a message that will collide with H(x) in the very last block.  But there are a ton of intermediate blocks, each with its own intermediate hash state.</p>
+<p>What if we could collide into one of those?  We could then append all the following blocks from the original message to produce the original H(x).  Almost.</p>
+<p>We can't do this exactly because the padding will mess things up.</p>
+<p>What we need are <em>expandable messages</em>.</p>
+<p>In the last problem we used multicollisions to produce 2^n colliding messages for n*2^(b/2) effort.  We can use the same principles to produce a set of messages of length (k, k + 2^k - 1) for a given k.</p>
+<p>Here's how:</p>
+<ul>
+<li>Starting from the hash function's initial state, find a collision between a single-block message and a message of 2^(k-1)+1 blocks.  DO NOT hash the entire long message each time.  Choose 2^(k-1) dummy blocks, hash those, then focus on the last block.</li>
+<li>Take the output state from the first step.  Use this as your new initial state and find another collision between a single-block message and a message of 2^(k-2)+1 blocks.</li>
+<li>Repeat this process k total times.  Your last collision should be between a single-block message and a message of 2^0+1 = 2 blocks.</li>
+</ul>
+<p>Now you can make a message of any length in (k, k + 2^k - 1) blocks by choosing the appropriate message (short or long) from each pair.</p>
+<p>Now we're ready to attack a long message M of 2^k blocks.</p>
+<ol>
+<li>Generate an expandable message of length (k, k + 2^k - 1) using the strategy outlined above.</li>
+<li>Hash M and generate a map of intermediate hash states to the block indices that they correspond to.</li>
+<li>From your expandable message's final state, find a single-block "bridge" to intermediate state in your map.  Note the index i it maps to.</li>
+<li>Use your expandable message to generate a prefix of the right length such that <em>len(prefix || bridge || M[i..]) = len(M)</em>.</li>
+</ol>
+<p>The padding in the final block should now be correct, and your forgery should hash to the same value as M.</p>
+<hr/>
+<p>See John Kelsey and Bruce Schneier, <a href="https://doi.org/10.1007/11426639_28">Second Preimages on $n$-bit Hash Functions for Much Less than $2^n$ Work</a>.</p>
+<p>This is a very theoretical result.  Given a hash size of $b$ bits, the Birthday paradox tells us there is a 50% chance of finding a collision after hashing $2^{b/2}$ random messages; that's unavoidable.  But the hope remains that both preimage attacks (given a hash value, find a message that hashes to it) and second preimage attacks (given a message, find another message that has the same hash value) still require a full scan of the hash space, i.e., order $2^b$ hashes.  This challenge shows that's not the case, but as will be seen, a successful attack would require significant computation and space.  The choice of $k$ figures greatly.</p>
+<p>The Merkle-Damgard construction requires some form of terminal "hardening" to be secure, usually by explicitly hashing a block containing the message's length after hashing the message itself (this is the padding referred to above).  The reason for this is subtle, and relates to the proof that M-D is no more prone to collisions than is the underlying compression function.  The above paper says that such hardening foils any attempt to collide messages of different lengths, though that's not obvious to us.  Given messages $p$ and $q$ with $|p| \ne |q|$, why couldn't it still be that $f(p \parallel |p|, h_0) = f(q \parallel |q|, h_0)$?  In any case, the paper's claim explains why this challenge is focused on creating a colliding message of the same length as the original.  (We don't append length blocks in our experiment below.)</p>
+<p>The design of the expandable message is clever.  We construct a table of colliding short and long message pairs as depicted below.  Then, for desired message length $l$, $k \le l \le k+2^k-1$, we concatenate a message selected from each pair, choosing the long message iff $l-k$ has a set bit in that position.</p>
+<table>
+<thead>
+<tr>
+<th>bit position</th>
+<th>short length</th>
+<th>long length</th>
+<th>input hash value</th>
+<th>common output hash value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>$k-1$</td>
+<td>$1$</td>
+<td>$1+2^{k-1}$</td>
+<td>$h_0$</td>
+<td>$h_1$</td>
+</tr>
+<tr>
+<td>$k-2$</td>
+<td>$1$</td>
+<td>$1+2^{k-2}$</td>
+<td>$h_1$</td>
+<td>$h_2$</td>
+</tr>
+<tr>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+<td>...</td>
+</tr>
+<tr>
+<td>$1$</td>
+<td>$1$</td>
+<td>$1+2^1$</td>
+<td>$h_{k-2}$</td>
+<td>$h_{k-1}$</td>
+</tr>
+<tr>
+<td>$0$</td>
+<td>$1$</td>
+<td>$1+2^0$</td>
+<td>$h_{k-1}$</td>
+<td>$h_k$</td>
+</tr>
+</tbody>
+</table>
+<p>Starting with the basic metric of $2^{b/2}$ "work" to find a random collision, Kelsey and Schneier double that in their estimate of the work required to find a collision between random short and long messages.  This gets repeated $k$ times, so the work to construct the table (adding in the hashes to build the long messages, which the paper ignores) is $2^k + k \cdot 2^{b/2+1}$ hashes.</p>
+<p>The construction presented in this challenge feels odd because the expandable message is entirely independent of the message we're trying to collide with.  Instead of there being a relationship, the algorithm has us searching for a "bridge block" that will continue the hashing of the expandable message and match the hash of some block in $M$.  But wait, isn't that just a second preimage attack in its own right, and therefore require order $2^b$ hashes?  Ah, but here's where the incremental hashing of $M$ comes into play.  If $M$ has $2^k$ blocks, and if the intermediate hashes of those blocks are indexed in a hash table (requiring $2^k$ hashes<sup>*</sup>), then we can compare the hash of a candidate bridge block against $2^k$ blocks simultaneously with the effect of reducing the work to $2^{b-k}$ hashes.  This is the motivation for making $k$ as large as possible.  (Actually, Kelsey and Schneier double the amount of work to $2^{b-k+1}$ hashes.  No explanation is given, and we don't understand why.)</p>
+<p>For our experiment we continue as before and use hash size $b = 16$ and AES-128, CBC mode for our compression function, and use $k = 7$ for reasons we will discuss later.  First, let's just confirm that we can create a colliding message.</p>
+<p>(*) The paper does not include this quantity in the work required to find a bridge block, but we do.</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=1e32ad47-69c3-4fc6-8581-767acc47f205">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [11]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">ExpandableMessage</span><span class="p">:</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">k</span><span class="p">,</span> <span class="n">ih</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">table</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_hashes</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># number of hashes required to build the table</span>
+        <span class="n">h</span> <span class="o">=</span> <span class="n">ih</span>
+        <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">k</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">):</span>
+            <span class="n">short</span><span class="p">,</span> <span class="n">long</span><span class="p">,</span> <span class="n">h</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">find_collision</span><span class="p">(</span><span class="mi">2</span><span class="o">**</span><span class="n">e</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span> <span class="n">h</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">table</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">short</span><span class="p">,</span> <span class="n">long</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">last_hash</span> <span class="o">=</span> <span class="n">h</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">find_collision</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">l</span><span class="p">,</span> <span class="n">ih</span><span class="p">):</span>
+        <span class="c1"># Find a short message (block length 1) and long message</span>
+        <span class="c1"># (block length l &gt; 1) that collide.</span>
+        <span class="c1"># Return (short, long, hash).</span>
+        <span class="n">long_base</span> <span class="o">=</span> <span class="n">randbytes</span><span class="p">((</span><span class="n">l</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">*</span><span class="mi">16</span><span class="p">)</span>
+        <span class="n">long_base_h</span> <span class="o">=</span> <span class="n">f</span><span class="p">(</span><span class="n">long_base</span><span class="p">,</span> <span class="n">ih</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_hashes</span> <span class="o">+=</span> <span class="n">l</span><span class="o">-</span><span class="mi">1</span>
+        <span class="n">seen</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+            <span class="n">short</span> <span class="o">=</span> <span class="n">randbytes</span><span class="p">(</span><span class="mi">16</span><span class="p">)</span>
+            <span class="n">h</span> <span class="o">=</span> <span class="n">f</span><span class="p">(</span><span class="n">short</span><span class="p">,</span> <span class="n">ih</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">num_hashes</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">if</span> <span class="n">h</span> <span class="ow">in</span> <span class="n">seen</span><span class="p">:</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">seen</span><span class="p">[</span><span class="n">h</span><span class="p">])</span> <span class="o">&gt;</span> <span class="mi">16</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">short</span><span class="p">,</span> <span class="n">seen</span><span class="p">[</span><span class="n">h</span><span class="p">],</span> <span class="n">h</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">seen</span><span class="p">[</span><span class="n">h</span><span class="p">]</span> <span class="o">=</span> <span class="n">short</span>
+            <span class="n">long_tail</span> <span class="o">=</span> <span class="n">randbytes</span><span class="p">(</span><span class="mi">16</span><span class="p">)</span>
+            <span class="n">h</span> <span class="o">=</span> <span class="n">f</span><span class="p">(</span><span class="n">long_tail</span><span class="p">,</span> <span class="n">long_base_h</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">num_hashes</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="k">if</span> <span class="n">h</span> <span class="ow">in</span> <span class="n">seen</span><span class="p">:</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">seen</span><span class="p">[</span><span class="n">h</span><span class="p">])</span> <span class="o">==</span> <span class="mi">16</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">seen</span><span class="p">[</span><span class="n">h</span><span class="p">],</span> <span class="n">long_base</span><span class="o">+</span><span class="n">long_tail</span><span class="p">,</span> <span class="n">h</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">seen</span><span class="p">[</span><span class="n">h</span><span class="p">]</span> <span class="o">=</span> <span class="n">long_base</span><span class="o">+</span><span class="n">long_tail</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">construct</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">l</span><span class="p">):</span>
+        <span class="c1"># Return message of length l.</span>
+        <span class="n">k</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">table</span><span class="p">)</span>
+        <span class="k">return</span> <span class="sa">b</span><span class="s2">""</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">table</span><span class="p">[</span><span class="n">i</span><span class="p">][(</span><span class="n">l</span><span class="o">-</span><span class="n">k</span><span class="p">)</span><span class="o">&amp;</span><span class="p">(</span><span class="mi">2</span><span class="o">**</span><span class="p">(</span><span class="n">k</span><span class="o">-</span><span class="mi">1</span><span class="o">-</span><span class="n">i</span><span class="p">))</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">]</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">k</span><span class="p">)</span>
+        <span class="p">)</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">construct_collision</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="n">k</span><span class="p">):</span>
+    <span class="c1"># Return (colliding message, number of hashes to build expandable</span>
+    <span class="c1"># message, number of hashes to find bridge block).</span>
+    <span class="c1"># First, construct an expandable message.</span>
+    <span class="n">em</span> <span class="o">=</span> <span class="n">ExpandableMessage</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">zero</span><span class="p">[:</span><span class="n">B</span><span class="p">])</span>
+    <span class="c1"># Incrementally hash the message.</span>
+    <span class="n">inc_hashes</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">h</span> <span class="o">=</span> <span class="n">zero</span><span class="p">[:</span><span class="n">B</span><span class="p">]</span>
+    <span class="n">num_hashes</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">message</span><span class="p">)</span><span class="o">//</span><span class="mi">16</span><span class="p">):</span>
+        <span class="n">h</span> <span class="o">=</span> <span class="n">f</span><span class="p">(</span><span class="n">message</span><span class="p">[</span><span class="n">i</span><span class="o">*</span><span class="mi">16</span><span class="p">:(</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">*</span><span class="mi">16</span><span class="p">],</span> <span class="n">h</span><span class="p">)</span>
+        <span class="n">num_hashes</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">if</span> <span class="n">i</span> <span class="o">&gt;=</span> <span class="n">k</span><span class="p">:</span>
+            <span class="n">inc_hashes</span><span class="p">[</span><span class="n">h</span><span class="p">]</span> <span class="o">=</span> <span class="n">i</span>
+    <span class="c1"># Find a bridge block.</span>
+    <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+        <span class="n">bridge</span> <span class="o">=</span> <span class="n">randbytes</span><span class="p">(</span><span class="mi">16</span><span class="p">)</span>
+        <span class="n">h</span> <span class="o">=</span> <span class="n">f</span><span class="p">(</span><span class="n">bridge</span><span class="p">,</span> <span class="n">em</span><span class="o">.</span><span class="n">last_hash</span><span class="p">)</span>
+        <span class="n">num_hashes</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">if</span> <span class="n">h</span> <span class="ow">in</span> <span class="n">inc_hashes</span><span class="p">:</span>
+            <span class="n">i</span> <span class="o">=</span> <span class="n">inc_hashes</span><span class="p">[</span><span class="n">h</span><span class="p">]</span>
+            <span class="k">break</span>
+    <span class="c1"># Construct and return a colliding message.</span>
+    <span class="n">forged</span> <span class="o">=</span> <span class="n">em</span><span class="o">.</span><span class="n">construct</span><span class="p">(</span><span class="n">i</span><span class="p">)</span> <span class="o">+</span> <span class="n">bridge</span> <span class="o">+</span> <span class="n">message</span><span class="p">[(</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">*</span><span class="mi">16</span><span class="p">:]</span>
+    <span class="k">return</span> <span class="n">forged</span><span class="p">,</span> <span class="n">em</span><span class="o">.</span><span class="n">num_hashes</span><span class="p">,</span> <span class="n">num_hashes</span>
+
+<span class="n">k</span> <span class="o">=</span> <span class="mi">7</span>
+<span class="n">M</span> <span class="o">=</span> <span class="n">randbytes</span><span class="p">(</span><span class="mi">2</span><span class="o">**</span><span class="n">k</span> <span class="o">*</span> <span class="mi">16</span><span class="p">)</span>
+<span class="n">M2</span><span class="p">,</span> <span class="n">num_hashes_em</span><span class="p">,</span> <span class="n">num_hashes_bb</span> <span class="o">=</span> <span class="n">construct_collision</span><span class="p">(</span><span class="n">M</span><span class="p">,</span> <span class="n">k</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">M</span><span class="p">),</span> <span class="n">f</span><span class="p">(</span><span class="n">M</span><span class="p">,</span> <span class="n">zero</span><span class="p">[:</span><span class="n">B</span><span class="p">])</span><span class="o">.</span><span class="n">hex</span><span class="p">())</span>
+<span class="nb">print</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">M2</span><span class="p">),</span> <span class="n">f</span><span class="p">(</span><span class="n">M2</span><span class="p">,</span> <span class="n">zero</span><span class="p">[:</span><span class="n">B</span><span class="p">])</span><span class="o">.</span><span class="n">hex</span><span class="p">())</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">M</span> <span class="o">==</span> <span class="n">M2</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>2048 50fa
+2048 50fa
+False
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=ae40ed65-32ce-4ae5-8929-fa1d94de6243">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<p>And now for the accounting.  The question here is not, Can we create a colliding message?  We always can, just keep looking.  The question is, How much more cheaply can we do it than order $2^b$ work?  The figures below are for $k = 7$.</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=4704fe02-22d2-4938-b5df-ad1eb91b0b55">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [12]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="s2">"Number of hashes required..."</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"    Desired minimum effort (2^b): </span><span class="si">{</span><span class="mi">2</span><span class="o">**</span><span class="n">b</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"    Paper's estimate: </span><span class="si">{</span><span class="p">(</span><span class="mi">2</span><span class="o">**</span><span class="n">k</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">k</span><span class="o">*</span><span class="mi">2</span><span class="o">**</span><span class="p">(</span><span class="n">b</span><span class="o">//</span><span class="mi">2</span><span class="o">+</span><span class="mi">1</span><span class="p">))</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="p">(</span><span class="mi">2</span><span class="o">**</span><span class="n">k</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">2</span><span class="o">**</span><span class="p">(</span><span class="n">b</span><span class="o">-</span><span class="n">k</span><span class="p">))</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"    Actual: </span><span class="si">{</span><span class="n">num_hashes_em</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">num_hashes_bb</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>Number of hashes required...
+    Desired minimum effort (2^b): 65536
+    Paper's estimate: 4352
+    Actual: 4515
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=2c434a57-6fb5-4c57-b03e-a53be5bfe4ee">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<p>What value do we choose for $k$?  Increasing $k$ reduces the effort to find the bridge block (recall $2^{b-k}$ hashes) but it also exponentially increases the size of the message ($2^k$ blocks) and the storage required for the incremental hash table.  We found empirically that for $b = 16$, work was minimized in the range $6 \le k \le 8$.</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=e9a61d29-b316-43c1-a28c-f3b2036bed5e">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [13]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">run_experiments</span><span class="p">():</span>
+    <span class="n">num_iterations</span> <span class="o">=</span> <span class="mi">100</span>
+    <span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span>
+        <span class="s2">"k"</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">),</span>
+        <span class="s2">"avg_hashes_em"</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">),</span>
+        <span class="s2">"avg_hashes_bb"</span><span class="p">:</span> <span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span><span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+    <span class="p">})</span>
+    <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">9</span><span class="p">):</span>
+        <span class="n">M</span> <span class="o">=</span> <span class="n">randbytes</span><span class="p">(</span><span class="mi">2</span><span class="o">**</span><span class="n">k</span> <span class="o">*</span> <span class="mi">16</span><span class="p">)</span>
+        <span class="n">sum_hashes_em</span> <span class="o">=</span> <span class="n">sum_hashes_bb</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_iterations</span><span class="p">):</span>
+            <span class="n">_</span><span class="p">,</span> <span class="n">num_hashes_em</span><span class="p">,</span> <span class="n">num_hashes_bb</span> <span class="o">=</span> <span class="n">construct_collision</span><span class="p">(</span><span class="n">M</span><span class="p">,</span> <span class="n">k</span><span class="p">)</span>
+            <span class="n">sum_hashes_em</span> <span class="o">+=</span> <span class="n">num_hashes_em</span>
+            <span class="n">sum_hashes_bb</span> <span class="o">+=</span> <span class="n">num_hashes_bb</span>
+        <span class="n">df</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="p">)]</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">"k"</span><span class="p">:</span> <span class="n">k</span><span class="p">,</span>
+            <span class="s2">"avg_hashes_em"</span><span class="p">:</span> <span class="n">sum_hashes_em</span><span class="o">/</span><span class="n">num_iterations</span><span class="p">,</span>
+            <span class="s2">"avg_hashes_bb"</span><span class="p">:</span> <span class="n">sum_hashes_bb</span><span class="o">/</span><span class="n">num_iterations</span>
+        <span class="p">}</span>
+    <span class="n">df</span><span class="o">.</span><span class="n">set_index</span><span class="p">(</span><span class="s2">"k"</span><span class="p">,</span> <span class="n">inplace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">df</span><span class="p">[</span><span class="s2">"total"</span><span class="p">]</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">avg_hashes_em</span> <span class="o">+</span> <span class="n">df</span><span class="o">.</span><span class="n">avg_hashes_bb</span>
+    <span class="k">return</span> <span class="n">df</span>
+
+<span class="n">df</span> <span class="o">=</span> <span class="n">run_experiments</span><span class="p">()</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">avg_hashes_em</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">avg_hashes_bb</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">total</span><span class="p">,</span> <span class="n">linewidth</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s2">"k"</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">xticks</span><span class="p">(</span><span class="nb">range</span><span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">9</span><span class="p">))</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s2">"number of hashes"</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">([</span><span class="s2">"build expandable message"</span><span class="p">,</span> <span class="s2">"find bridge block"</span><span class="p">,</span> <span class="s2">"total"</span><span class="p">])</span>
+<span class="kc">None</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedImage jp-OutputArea-output" tabindex="0">
+<img alt="No description has been provided for this image" class="" src="data:image/png;base64,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gahdu3bExcVx8uRJw9os48aN46+//jL0tGg0Gv744w9efPFFw+NcXV1ZsGABffr04cKFC/j5+XH48GEaNWrEjh07aN++PTdv3sTV1ZU333yTxMRENmzYYHh8jx49CA4OvufA6++//57p06dz+vRpQ11ZWVm4urqydu1aOnXqBEDXrl1JSkrC2toaCwsLgoODDcf36dOHdevWcenSJcPq4UuXLuX9998nMTGxwO1Vrl+/joeHB8ePH6devXqG1/b111/Tv7/+D89Tp05Rt25dTp8+Te3atR/q9QHUq1ePwYMHM3y4fixo1apVCQgIYNOmTUbnSUpKYuPGjfl+FoX9Ht0p72ezdetWnnnmGQBmz57N+PHjiYiIoFq1agAMHjyYCxcuEBwcTGZmJm5ubmzdupXAwEDDuQYMGEBaWhqrV6/mhRdeoHz58nz77bf5nvOdd97h5MmTbN26tVDr//z6668MHjyY69evG74HKSkprF+/3nDMW2+9xfr16w3f3w4dOvDMM88wfvx4wzHff/89H3zwAVevXs33HHf/vt7JlPdv6SFSkbWFNVPbTOXtjW+joM+lWbosJodMZmXnlWg1ckVTiOLAzsqCU9OCVHtuU7Rq1crojSowMJB58+aRm5uLhYVp5yrI6dOneemll4zaAgMDCQ4Ovudjjh49yrlz53BycjJqz8jIMLqk9e2331KrVi20Wq1RqMvTsGFDo61UAgMDSUlJ4dKlS1SpUoXw8HAmTZrE3r17uX79umFj3qioKOrVq2d4XIMGDQyfV6hQAYC4uDhq165dqNeXkpLClClT2LBhA9HR0eTk5JCenk5UVFS+x9399b1mnhX2e1SQO1+Pl5cX9vb2hjCU17Zv3z4Azp07R1paWr5eqqysLBo3bgzAkCFD6N69O4cOHaJTp068+OKLtG7dGtAH044dO+Lv70/nzp3p2rWrUVjbunUrs2bN4syZMyQlJZGTk0NGRgZpaWnY29sTFhaW7/vbokULo4B09OhRdu/ebej5A/0q1Heepyio+o6bm5vLxIkTDdcxq1evzscff2x0vVtRFCZNmkSFChWws7OjQ4cOhIeHG50nPj6enj174uzsjKurK/379893zfLYsWM8+eST2Nra4uvry9y5cx/La3yQhh4NeavOW0Zth+MO8+OZH1WqSAhxN41Gg721pSo3c6+WrdFo8o1L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"/>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=c4a809eb-9cc9-437b-b52e-b1d0a1ba7bc3">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<h2 id="Challenge-54:-Kelsey-and-Kohno's-Nostradamus-attack">Challenge 54: Kelsey and Kohno's Nostradamus attack<a class="anchor-link" href="#Challenge-54:-Kelsey-and-Kohno's-Nostradamus-attack">¶</a></h2><p>Hash functions are sometimes used as proof of a secret prediction.</p>
+<p>For example, suppose you wanted to predict the score of every Major League Baseball game in a season.  (2,430 in all.)  You might be concerned that publishing your predictions would affect the outcomes.</p>
+<p>So instead you write down all the scores, hash the document, and publish the hash.  Once the season is over, you publish the document.  Everyone can then hash the document to verify your soothsaying prowess.</p>
+<p>But what if you can't accurately predict the scores of 2.4k baseball games?  Have no fear - forging a prediction under this scheme reduces to another second preimage attack.</p>
+<p>We could apply the long message attack from the previous problem, but it would look pretty shady.  Would you trust someone whose predicted message turned out to be 2^50 bytes long?</p>
+<p>It turns out we can run a successful attack with a much shorter suffix.  Check the method:</p>
+<ol>
+<li>Generate a large number of initial hash states.  Say, 2^k.</li>
+<li>Pair them up and generate single-block collisions.  Now you have 2^k hash states that collide into 2^(k-1) states.</li>
+<li>Repeat the process.  Pair up the 2^(k-1) states and generate collisions.  Now you have 2^(k-2) states.</li>
+<li>Keep doing this until you have one state.  This is your prediction.</li>
+<li>Well, sort of.  You need to commit to some length to encode in the padding.  Make sure it's long enough to accommodate your actual message, this suffix, and a little bit of glue to join them up.  Hash this padding block using the state from step 4 - THIS is your prediction.</li>
+</ol>
+<p>What did you just build?  It's basically a funnel mapping many initial states into a common final state.  What's critical is we now have a big field of 2^k states we can try to collide into, but the actual suffix will only be k+1 blocks long.</p>
+<p>The rest is trivial:</p>
+<ol>
+<li>Wait for the end of the baseball season.  (This may take some time.)</li>
+<li>Write down the game results.  Or, you know, anything else. I'm not too particular.</li>
+<li>Generate enough glue blocks to get your message length right.  The last block should collide into one of the leaves in your tree.</li>
+<li>Follow the path from the leaf all the way up to the root node and build your suffix using the message blocks along the way.</li>
+</ol>
+<p>The difficulty here will be around 2^(b-k).  By increasing or decreasing k in the tree generation phase, you can tune the difficulty of this step.  It probably makes sense to do more work up-front, since people will be waiting on you to supply your message once the event passes.  Happy prognosticating!</p>
+<hr/>
+<p>See John Kelsey and Tadayoshi Kohno, <a href="https://doi.org/10.1007/11761679_12">Herding Hash Functions and the Nostradamus Attack</a>.</p>
+<p>This is a slight variation on the previous challenge, and despite the catchy framing is again quite theoretical in nature.  In the previous challenge we used brute force to find a bridge block between an expandable message and a set of entry points (the intermediate hashes of a $2^k$-block message).  The feasibility of doing this hinges on choosing $k$ large enough that the work required, $2^{b-k}$, is sufficiently reduced.  Here we start with a known message (our prediction) and find a bridge block between it and the $2^k$ leaves of a specially constructed tree (or "funnel") of random message blocks.</p>
+<p>As noted in the previous challenge, a message's length would ordinarily be incorporated into the message's final hash value.  We omit lengths here, but are careful to maintain the same message length by using a fixed length for our prediction and by bridging into leaf nodes of the tree only, so that the path up the tree is of constant length.  (In principle we could bridge into any node in the tree, as all nodes ultimately hash to the same value, but then some kind of expandable message would need to be incorporated to counter the effect of traveling different length paths through the tree.)</p>
+<p>For our demonstration below we imagine predicting whether the British will arrive by land or by sea.  We compute the tree by simple brute force, but the paper authors note that there are more efficient ways of doing this.</p>
+<p>First, create a pre-event prediction.</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=8b4fafc0-3d1b-49bb-8f00-6911684fb7de">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [14]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="n">k</span> <span class="o">=</span> <span class="mi">4</span>
+<span class="n">prediction_buffer_len</span> <span class="o">=</span> <span class="mi">6</span>  <span class="c1"># in blocks; roughly 100 bytes</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">Funnel</span><span class="p">:</span>
+
+    <span class="k">class</span><span class="w"> </span><span class="nc">Node</span><span class="p">:</span>
+        <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">block</span><span class="p">,</span> <span class="nb">hash</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">block</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">hash</span> <span class="o">=</span> <span class="n">block</span><span class="p">,</span> <span class="nb">hash</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">parent</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">k</span><span class="p">):</span>
+        <span class="c1"># Create the leaf level of 2^k random messages with unique hash values.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">leaf_hashes</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">while</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">leaf_hashes</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="o">**</span><span class="n">k</span><span class="p">:</span>
+            <span class="n">m</span> <span class="o">=</span> <span class="n">randbytes</span><span class="p">(</span><span class="mi">16</span><span class="p">)</span>
+            <span class="n">h</span> <span class="o">=</span> <span class="n">f</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="n">zero</span><span class="p">[:</span><span class="n">B</span><span class="p">])</span>
+            <span class="k">if</span> <span class="n">h</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">leaf_hashes</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">leaf_hashes</span><span class="p">[</span><span class="n">h</span><span class="p">]</span> <span class="o">=</span> <span class="n">Funnel</span><span class="o">.</span><span class="n">Node</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="n">h</span><span class="p">)</span>
+        <span class="n">level</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">leaf_hashes</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+        <span class="c1"># Now create the remaining levels of the tree up to the root.</span>
+        <span class="k">while</span> <span class="nb">len</span><span class="p">(</span><span class="n">level</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="n">next_level</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">level</span><span class="p">),</span> <span class="mi">2</span><span class="p">):</span>
+                <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+                    <span class="n">m</span> <span class="o">=</span> <span class="n">randbytes</span><span class="p">(</span><span class="mi">16</span><span class="p">)</span>
+                    <span class="n">h1</span><span class="p">,</span> <span class="n">h2</span> <span class="o">=</span> <span class="n">f</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="n">level</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">hash</span><span class="p">),</span> <span class="n">f</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="n">level</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">hash</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">h1</span> <span class="o">==</span> <span class="n">h2</span><span class="p">:</span>
+                        <span class="n">n</span> <span class="o">=</span> <span class="n">Funnel</span><span class="o">.</span><span class="n">Node</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="n">h1</span><span class="p">)</span>
+                        <span class="n">level</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="o">.</span><span class="n">parent</span> <span class="o">=</span> <span class="n">level</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">parent</span> <span class="o">=</span> <span class="n">n</span>
+                        <span class="n">next_level</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
+                        <span class="k">break</span>
+            <span class="n">level</span> <span class="o">=</span> <span class="n">next_level</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">final_hash</span> <span class="o">=</span> <span class="n">h1</span>
+
+<span class="n">funnel</span> <span class="o">=</span> <span class="n">Funnel</span><span class="p">(</span><span class="n">k</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Pre-event prediction length: </span><span class="si">{</span><span class="p">(</span><span class="n">prediction_buffer_len</span><span class="o">+</span><span class="n">k</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span><span class="o">*</span><span class="mi">16</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Pre-event pediction hash: </span><span class="si">{</span><span class="n">funnel</span><span class="o">.</span><span class="n">final_hash</span><span class="o">.</span><span class="n">hex</span><span class="p">()</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>Pre-event prediction length: 176
+Pre-event pediction hash: 77e2
+</pre>
+</div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell jp-MarkdownCell jp-Notebook-cell" id="cell-id=8c40ad56-ce6c-4689-bed1-d01a5c512431">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea"><div class="jp-InputPrompt jp-InputArea-prompt">
+</div><div class="jp-RenderedHTMLCommon jp-RenderedMarkdown jp-MarkdownOutput" data-mime-type="text/markdown">
+<p>Now let's make a prediction after the fact.</p>
+</div>
+</div>
+</div>
+</div><div class="jp-Cell jp-CodeCell jp-Notebook-cell" id="cell-id=d38ad912-55de-44ac-bd7b-b48717b37b18">
+<div class="jp-Cell-inputWrapper" tabindex="0">
+<div class="jp-Collapser jp-InputCollapser jp-Cell-inputCollapser">
+</div>
+<div class="jp-InputArea jp-Cell-inputArea">
+<div class="jp-InputPrompt jp-InputArea-prompt">In [15]:</div>
+<div class="jp-CodeMirrorEditor jp-Editor jp-InputArea-editor" data-type="inline">
+<div class="cm-editor cm-s-jupyter">
+<div class="highlight hl-ipython3"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">attach_funnel</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="n">funnel</span><span class="p">):</span>
+    <span class="n">message_hash</span> <span class="o">=</span> <span class="n">f</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="n">zero</span><span class="p">[:</span><span class="n">B</span><span class="p">])</span>
+    <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+        <span class="n">bridge</span> <span class="o">=</span> <span class="n">randbytes</span><span class="p">(</span><span class="mi">16</span><span class="p">)</span>
+        <span class="n">h</span> <span class="o">=</span> <span class="n">f</span><span class="p">(</span><span class="n">bridge</span><span class="p">,</span> <span class="n">message_hash</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">h</span> <span class="ow">in</span> <span class="n">funnel</span><span class="o">.</span><span class="n">leaf_hashes</span><span class="p">:</span>
+            <span class="n">message</span> <span class="o">+=</span> <span class="n">bridge</span>
+            <span class="c1"># Now walk up the tree to the root node.</span>
+            <span class="n">n</span> <span class="o">=</span> <span class="n">funnel</span><span class="o">.</span><span class="n">leaf_hashes</span><span class="p">[</span><span class="n">h</span><span class="p">]</span><span class="o">.</span><span class="n">parent</span>
+            <span class="k">while</span> <span class="n">n</span> <span class="o">!=</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">message</span> <span class="o">+=</span> <span class="n">n</span><span class="o">.</span><span class="n">block</span>
+                <span class="n">n</span> <span class="o">=</span> <span class="n">n</span><span class="o">.</span><span class="n">parent</span>
+            <span class="k">break</span>
+    <span class="k">return</span> <span class="n">message</span>
+
+<span class="n">prediction</span> <span class="o">=</span> <span class="sa">b</span><span class="s2">"A second lamp in the belfry burns!"</span>
+<span class="n">prediction</span> <span class="o">+=</span> <span class="sa">b</span><span class="s2">" "</span><span class="o">*</span><span class="p">(</span><span class="n">prediction_buffer_len</span><span class="o">*</span><span class="mi">16</span><span class="o">-</span><span class="nb">len</span><span class="p">(</span><span class="n">prediction</span><span class="p">))</span>
+<span class="n">prediction</span> <span class="o">=</span> <span class="n">attach_funnel</span><span class="p">(</span><span class="n">prediction</span><span class="p">,</span> <span class="n">funnel</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Post-event prediction length: </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">prediction</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Post-event prediction hash: </span><span class="si">{</span><span class="n">f</span><span class="p">(</span><span class="n">prediction</span><span class="p">,</span><span class="w"> </span><span class="n">zero</span><span class="p">[:</span><span class="n">B</span><span class="p">])</span><span class="o">.</span><span class="n">hex</span><span class="p">()</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+<div class="jp-Cell-outputWrapper">
+<div class="jp-Collapser jp-OutputCollapser jp-Cell-outputCollapser">
+</div>
+<div class="jp-OutputArea jp-Cell-outputArea">
+<div class="jp-OutputArea-child">
+<div class="jp-OutputPrompt jp-OutputArea-prompt"></div>
+<div class="jp-RenderedText jp-OutputArea-output" data-mime-type="text/plain" tabindex="0">
+<pre>Post-event prediction length: 176
+Post-event prediction hash: 77e2
 </pre>
 </div>
 </div>
