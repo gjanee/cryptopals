@@ -7523,13 +7523,13 @@ a.anchor-link {
 <p>Three of the challenges in this set are extremely valuable in breaking real-world crypto; one allows you to decrypt messages encrypted in the default mode of AES, and the other two allow you to rewrite messages encrypted in the most popular modes of AES.</p>
 <ul>
 <li><a href="#Preliminaries">Preliminaries</a></li>
-<li><a href="#Challenge-9:-Implement-PKCS#7-padding">Challenge 9: Implement PKCS#7 padding</a></li>
+<li><a href="#Challenge-9:-Implement-PKCS%237-padding">Challenge 9: Implement PKCS#7 padding</a></li>
 <li><a href="#Challenge-10:-Implement-CBC-mode">Challenge 10: Implement CBC mode</a></li>
 <li><a href="#Challenge-11:-An-ECB/CBC-detection-oracle">Challenge 11: An ECB/CBC detection oracle</a></li>
-<li><a href="#Challenge-12:-Byte-at-a-time-ECB-decryption-(Simple">Challenge 12. Byte-at-a-time ECB decryption (Simple)</a>)</li>
+<li><a href="#Challenge-12:-Byte-at-a-time-ECB-decryption-(Simple)">Challenge 12. Byte-at-a-time ECB decryption (Simple)</a></li>
 <li><a href="#Challenge-13:-ECB-cut-and-paste">Challenge 13: ECB cut-and-paste</a></li>
-<li><a href="#Challenge-14:-Byte-at-a-time-ECB-decryption-(Harder">Challenge 14: Byte-at-a-time ECB decryption (Harder)</a>)</li>
-<li><a href="#Challenge-15:-PKCS#7-padding-validation">Challenge 15: PKCS#7 padding validation</a></li>
+<li><a href="#Challenge-14:-Byte-at-a-time-ECB-decryption-(Harder)">Challenge 14: Byte-at-a-time ECB decryption (Harder)</a></li>
+<li><a href="#Challenge-15:-PKCS%237-padding-validation">Challenge 15: PKCS#7 padding validation</a></li>
 <li><a href="#Challenge-16:-CBC-bitflipping-attacks">Challenge 16: CBC bitflipping attacks</a></li>
 </ul>
 <h2 id="Preliminaries">Preliminaries<a class="anchor-link" href="#Preliminaries">¶</a></h2>
@@ -7936,7 +7936,7 @@ YnkK
 </tbody>
 </table>
 <p>The length of the unknown string is obscured by the blockiness of the cipher, but we detect it by counting how many input bytes can be supplied before the returned ciphertext size increases by another block.  (Though we do not check it here, the step increase in the size of the ciphertext would reveal the block size.)</p>
-<p>The code below anticipates <a href="#Challenge-14:-Byte-at-a-time-ECB-decryption-(Harder">Challenge 14</a>), in which a random prefix is placed before the input string.  The <code>rpl</code> argument is the length of the random prefix and <code>fl</code> is the number of bytes needed to pad (or "fill") the prefix to the next block boundary; both are zero for this challenge.</p>
+<p>The code below anticipates <a href="#Challenge-14:-Byte-at-a-time-ECB-decryption-(Harder)">Challenge 14</a>, in which a random prefix is placed before the input string.  The <code>rpl</code> argument is the length of the random prefix and <code>fl</code> is the number of bytes needed to pad (or "fill") the prefix to the next block boundary; both are zero for this challenge.</p>
 <p><code>detect_unknown_string_length</code> begins in this state:</p>
 <pre><code>|&lt;-                                         l -&gt;|
 |&lt;-    rpl -&gt;|&lt;- fl -&gt;|
@@ -8243,7 +8243,7 @@ Did you stop? No, I just drove by
 <p>If you are writing in a language with exceptions, like Python or Ruby, make your function throw an exception on bad padding.</p>
 <p>Crypto nerds know where we're going with this.  Bear with us.</p>
 <hr/>
-<p>Implemented under <a href="#Challenge-9:-Implement-PKCS#7-padding">Challenge 9</a> above.</p>
+<p>Implemented under <a href="#Challenge-9:-Implement-PKCS%237-padding">Challenge 9</a> above.</p>
 </div>
 </div>
 </div>

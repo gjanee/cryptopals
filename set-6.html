@@ -7530,8 +7530,8 @@ a.anchor-link {
 <li><a href="#Challenge-44:-DSA-nonce-recovery-from-repeated-nonce">Challenge 44: DSA nonce recovery from repeated nonce</a></li>
 <li><a href="#Challenge-45:-DSA-parameter-tampering">Challenge 45: DSA parameter tampering</a></li>
 <li><a href="#Challenge-46:-RSA-parity-oracle">Challenge 46: RSA parity oracle</a></li>
-<li><a href="#Challenge-47:-Bleichenbacher%27s-PKCS-1.5-Padding-Oracle-(Simple-Case">Challenge 47: Bleichenbacher's PKCS 1.5 Padding Oracle (Simple Case)</a>)</li>
-<li><a href="#Challenge-48:-Bleichenbacher%27s-PKCS-1.5-Padding-Oracle-(Complete-Case">Challenge 48: Bleichenbacher's PKCS 1.5 Padding Oracle (Complete Case)</a>)</li>
+<li><a href="#Challenge-47:-Bleichenbacher%27s-PKCS-1.5-Padding-Oracle-(Simple-Case)">Challenge 47: Bleichenbacher's PKCS 1.5 Padding Oracle (Simple Case)</a></li>
+<li><a href="#Challenge-48:-Bleichenbacher%27s-PKCS-1.5-Padding-Oracle-(Complete-Case)">Challenge 48: Bleichenbacher's PKCS 1.5 Padding Oracle (Complete Case)</a></li>
 </ul>
 <h2 id="Preliminaries">Preliminaries<a class="anchor-link" href="#Preliminaries">¶</a></h2>
 </div>
@@ -8641,7 +8641,7 @@ b"That's why I found you don't play around with the Funky Cold Medina"<span styl
 <p><strong>Cryptanalytic MVP award</strong></p>
 <p>This is an extraordinarily useful attack.  PKCS#1v15 padding, despite being totally insecure, <em>is the default padding used by RSA implementations</em>.  The OAEP standard that replaces it is not widely implemented.  This attack routinely breaks SSL/TLS.</p>
 </blockquote>
-<p>This is a continuation of <a href="#Challenge-47:-Bleichenbacher%27s-PKCS-1.5-Padding-Oracle-(Simple-Case">challenge #47</a>); it implements the complete BB'98 attack.</p>
+<p>This is a continuation of <a href="#Challenge-47:-Bleichenbacher%27s-PKCS-1.5-Padding-Oracle-(Simple-Case)">challenge #47</a>; it implements the complete BB'98 attack.</p>
 <p>Set yourself up the way you did in #47, but this time generate a 768 bit modulus.</p>
 <p>To make the attack work with a realistic RSA keypair, you need to reproduce step 2b from the paper, and your implementation of Step 3 needs to handle multiple ranges.</p>
 <p>The full Bleichenbacher attack works basically like this:</p>
